@@ -33,6 +33,18 @@ MikoPBX (REBOOT_TEST_PASS).
 
 ## Фактические результаты
 
+### Прогон 2026-11-14 (вечер), ISO VLANit-PBX-1.2.8-amd64.iso (финальный, #9/#10/#17/#18 + безопасность)
+
+| Тест | Результат |
+|---|---|
+| Т1–Т9 полный прогон | PASS (агент: **49 проверок**, 0 FAIL, 0 WARN — reboot-api-login стал PASS) |
+
+Закрыты: #10 (/.dockerenv-маркер — provisioning применяет env при каждом
+старте), #17 (ExecStartPre порядок + ключи при установке, 0 падений sshd),
+#18 (TZ АТС: localtime + TZ + PBXTimezone), #9 (vlanit-doctor — проверка
+агентом PASS). Безопасность: пароль в Podman secret (проверки secret/
+no-plaintext PASS), nft skuid != 0 (проверка PASS).
+
 ### Прогон 2026-11-14, ISO VLANit-PBX-1.2.7-amd64.iso (ponytail-фиксы #21–#23)
 
 | Тест | Результат |
