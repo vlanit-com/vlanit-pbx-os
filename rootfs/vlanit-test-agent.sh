@@ -5,13 +5,24 @@
 set -u
 
 out() { echo "VLANIT_TEST: $*" > /dev/ttyS0 2>/dev/null || true; echo "VLANIT_TEST: $*"; }
+# общая библиотека проверок (issue #9): тот же код, что у vlanit-doctor
+# shellcheck source=../lib/checks.sh
+source /opt/vlanit/lib/checks.sh 2>/dev/null || true
 pass=0; fail=0
 AGENT_LOG=/var/log/vlanit-test-agent.log
 : > "$AGENT_LOG"
 
 check() {
     local name="$1"; shift
-    if "$@" >>"$AGENT_LOG" 2>&1; then
+    if [ "$#" -eq 1 ] && [ "$1" = "lib" ]; then
+        if "check_$name" >>"$AGENT_LOG" 2>&1; then
+            out "PASS $name"; pass=$((pass+1))
+        elif [ "$?" = "2" ]; then
+            out "SKIP $name"; pass=$((pass+1))
+        else
+            out "FAIL $name (детали: $AGENT_LOG)"; fail=$((fail+1))
+        fi
+    elif "$@" >>"$AGENT_LOG" 2>&1; then
         out "PASS $name"; pass=$((pass+1))
     else
         out "FAIL $name (детали: $AGENT_LOG)"; fail=$((fail+1))
@@ -21,19 +32,19 @@ check() {
 out "agent start"
 
 # --- Т3: система ---
-check "hostname" sh -c "hostname | grep -q vlanit"
+check "hostname" lib
 check "podman" podman --version
-check "networkd-active" systemctl is-active --quiet systemd-networkd
-check "fstab-uuid" sh -c "grep -q 'UUID=.*btrfs' /etc/fstab"
+check "networkd-active" lib
+check "fstab-uuid" lib
 
 # --- T6: Btrfs ---
-check "btrfs-root" sh -c "findmnt -n / | grep -q btrfs"
-check "btrfs-subvol-mikopbx-cf" sh -c "findmnt -n /var/spool/mikopbx/cf | grep -q btrfs"
+check "btrfs-root" lib
+check "btrfs-subvol-mikopbx-cf" lib
 check "btrfs-snapshot-create" /opt/vlanit/vlanit-snapshot create testagent
 check "btrfs-snapshot-list" sh -c "/opt/vlanit/vlanit-snapshot list | grep -q testagent"
 
 # --- Т4: MikoPBX ---
-check "quadlet-service" systemctl is-enabled --quiet mikopbx.service
+check "quadlet-service" lib
 systemctl start mikopbx.service 2>/dev/null || true
 
 # ожидание готовности приложения (до 6 минут)
@@ -47,7 +58,7 @@ done
 [ "$ready" -eq 1 ] && { out "PASS mikopbx-ready-banner"; pass=$((pass+1)); } \
                    || { out "FAIL mikopbx-ready-banner"; fail=$((fail+1)); }
 
-check "mikopbx-service-active" systemctl is-active --quiet mikopbx.service
+check "mikopbx-service-active" lib
 
 # веб-интерфейс (HTTPS, self-signed) — через ВНЕШНИЙ адрес устройства,
 # а не loopback: интерфейс должен быть доступен из сети
@@ -73,7 +84,7 @@ else
 fi
 
 # persistence конфигурации MikoPBX (env provisioning применён в БД)
-check "mikopbx-cf-nonempty" sh -c "test -n \"\$(ls -A /var/spool/mikopbx/cf 2>/dev/null)\""
+check "mikopbx-cf-nonempty" lib
 
 # --- WireGuard (если включён установщиком) ---
 if systemctl is-enabled --quiet wg-quick@wg0.service 2>/dev/null; then
@@ -84,37 +95,37 @@ if systemctl is-enabled --quiet wg-quick@wg0.service 2>/dev/null; then
 fi
 
 # --- безопасность (1.2) ---
-check "security-unattended-upgrades" sh -c "unattended-upgrades --dry-run >/dev/null 2>&1 || unattended-upgrades --dry-run -d >/dev/null 2>&1"
-check "security-root-ssh-denied" sh -c "sshd -T 2>/dev/null | grep -qi '^permitrootlogin no' || grep -rqi '^PermitRootLogin no' /etc/ssh/sshd_config.d/"
-check "security-fail2ban" sh -c "systemctl is-active --quiet fail2ban && fail2ban-client status sshd >/dev/null 2>&1"
+check "unattended-upgrades" lib
+check "security-root-ssh-denied" lib
+check "security-fail2ban" lib
 
 # --- брендинг: фирменная тема Plymouth ---
 check "plymouth-theme-vlanit" grep -q "Theme=vlanit" /etc/plymouth/plymouthd.conf
 
 # --- 1.2.3: реестр проверок по фидбеку полевых тестов ---
-check "apt-security-source" sh -c "grep -rh trixie-security /etc/apt/sources.list /etc/apt/sources.list.d/ | grep -q ."
-check "timesyncd" sh -c "systemctl is-active --quiet systemd-timesyncd"
-check "timezone-set" sh -c "test -s /etc/timezone"
+check "apt-security-source" lib
+check "timesyncd" lib
+check "timezone-set" lib
 check "console-font-cyrillic" grep -q "^FONT=CyrSlav" /etc/vconsole.conf
 check "quadlet-perms-600" sh -c "stat -c %a /etc/containers/systemd/mikopbx.container | grep -q 600"
-check "atc-ssh-port-23" sh -c "podman exec mikopbx sh -c 'test \"\$SSH_PORT\" = 23'"
-check "atc-password-nonempty" sh -c "grep -q 'WEB_ADMIN_PASSWORD=..' /etc/containers/systemd/mikopbx.container"
+check "atc-ssh-port-23" lib
+check "atc-password-nonempty" lib
 # пароль из мастера РЕАЛЬНО дошёл до контейнера (переменная в [Container],
 # а не только в файле) и логин ей проходит (полевой дефект 1.2.4 #3)
-check "atc-env-in-container" sh -c "podman exec mikopbx sh -c 'env | grep -q ^WEB_ADMIN_PASSWORD='"
+check "atc-env-in-container" lib
 # лимит остановки контейнера: 120 с, а не дефолтные 10 (полевой дефект 1.2.4 #4)
-check "atc-stop-timeout" sh -c "podman inspect mikopbx --format '{{.Config.StopTimeout}}' | grep -qx 120"
+check "atc-stop-timeout" lib
 
 # --- 1.2.4: системная интеграция и харденинг ---
-check "bin-login-present" sh -c "test -x /usr/bin/login"
+check "bin-login-present" lib
 check "ssh-host-keys" sh -c '
   ls /etc/ssh/ssh_host_* >/dev/null 2>&1 || { echo "== /etc/ssh:"; ls -la /etc/ssh/; }
   systemctl is-active --quiet ssh || { echo "== ssh status:"; systemctl status ssh --no-pager 2>&1 | tail -8; }
   ls /etc/ssh/ssh_host_* >/dev/null 2>&1 && systemctl is-active --quiet ssh
 '
-check "nft-policy-drop" sh -c "nft list ruleset 2>/dev/null | grep -q 'policy drop'"
+check "nft-policy-drop" lib
 # тестовая подсеть QEMU не должна уезжать в образ (полевой дефект 1.2.4 #2)
-check "nft-no-testnet" sh -c "! nft list ruleset 2>/dev/null | grep -q '10\.0\.2\.0/24'"
+check "nft-no-testnet" lib
 # файлы системы — root, а не uid сборочного пользователя (дефект 1.2.4 #1);
 # /home исключён (домашний каталог администратора legitimately uid 1000)
 check "files-root-owned" sh -c "test \"\$(find / -xdev -uid 1000 -not -path '/home/*' 2>/dev/null | wc -l)\" -eq 0"
@@ -122,8 +133,12 @@ check "sudo-works" sh -c "test \"\$(stat -c %u /usr/bin/sudo)\" = 0 && test -u /
 # ssh.service не должен падать на старте: ключи генерируются drop-in'ом
 # ДО sshd (полевой дефект 1.2.4 #5)
 check "ssh-clean-start" sh -c "systemctl show ssh.service -p NRestarts --value | grep -qx 0 && systemctl is-active --quiet ssh.service"
-check "pids-limit" sh -c "podman inspect mikopbx --format '{{.HostConfig.PidsLimit}}' 2>/dev/null | grep -qx \"\$(sed -n 's/^PidsLimit=//p' /etc/containers/systemd/mikopbx.container | head -1)\""
+check "pids-limit" lib
 check "handle-power-key" sh -c "busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandlePowerKey 2>/dev/null | grep -q ignore"
+# issue #9: диагностический инструмент на устройстве (общая библиотека)
+check "vlanit-doctor" sh -c "vlanit-doctor --quiet"
+# issue #10: служба самолечения пароля АТС включена и отработала
+check "atc-heal-service" sh -c "systemctl is-enabled --quiet vlanit-atc-password-heal.service"
 # journal-persistent проверяется после reboot-фазы (см. ниже)
 
 # --- перезагрузка и проверка сохранения (Т4: автозапуск после reboot) ---

@@ -123,6 +123,11 @@ install -D -m 0755 "$PROJECT_ROOT/snapshots/vlanit-rollback" \
     "$ROOTFS/usr/local/sbin/vlanit-rollback"
 install -D -m 0755 "$PROJECT_ROOT/snapshots/vlanit-backup" \
     "$ROOTFS/usr/local/sbin/vlanit-backup"
+# диагностика (issue #9): doctor + общая библиотека проверок
+install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-doctor" \
+    "$ROOTFS/usr/local/sbin/vlanit-doctor"
+install -D -m 0644 "$PROJECT_ROOT/rootfs/lib-checks.sh" \
+    "$ROOTFS/opt/vlanit/lib/checks.sh"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-release.pub" \
     "$ROOTFS/etc/vlanit/release.pub"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-update.conf" \
@@ -203,8 +208,13 @@ install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-backup-test.sh" \
 install -D -m 0644 "$PROJECT_ROOT/rootfs/vlanit-backup-test.service" \
     "$ROOTFS/etc/systemd/system/vlanit-backup-test.service"
 # preset-файл попадает в rootfs уже после установки пакетов — включаем службы явно
+install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-atc-password-heal.sh" \
+    "$ROOTFS/opt/vlanit/vlanit-atc-password-heal.sh"
+install -D -m 0644 "$PROJECT_ROOT/rootfs/vlanit-atc-password-heal.service" \
+    "$ROOTFS/etc/systemd/system/vlanit-atc-password-heal.service"
 for unit in vlanit-firstboot.service vlanit-test-agent.service \
             vlanit-ota-test.service vlanit-backup-test.service \
+            vlanit-atc-password-heal.service \
             systemd-networkd.service systemd-resolved.service \
             systemd-timesyncd.service nftables.service \
             ssh.service fail2ban.service; do

@@ -26,16 +26,29 @@
 
 ## Podman / MikoPBX
 
-**Пароль веб-админа из мастера перестал приниматься после жёсткого
-отключения питания (стандартный admin/admin работает).**
+**Пароль веб-админа из мастера перестал приниматься после перезагрузки
+или жёсткого отключения питания (стандартный admin/admin работает).**
 Механизм: env `WEB_ADMIN_PASSWORD` применяется provisioning'ом MikoPBX при
 первом старте; маркер применения хранится в `PbxSettings.CLOUD_INSTANCE_ID`
 (открытым текстом). Жёсткое отключение питания до checkpoint SQLite WAL
 откатывает запись хэша пароля, а маркер выживает → provisioning считает
-пароль «уже применённым» и не повторяет. Митигация: задать пароль заново
-через консоль MikoPBX (`podman exec -it mikopbx /etc/rc/console_menu`);
-постоянное исправление — в ожидании решения upstream. Регрессионная
-проверка: `reboot-api-login` в тест-агенте.
+пароль «уже применённым» и не повторяет.
+
+**Автоматическое самолечение (с 1.3.0, issue #10):** служба
+`vlanit-atc-password-heal` на каждой загрузке проверяет логин паролем из
+quadlet и при сбросе повторно применяет его через REST v3
+(`PATCH /pbxcore/api/v3/general-settings`). Диагностика:
+
+```bash
+systemctl status vlanit-atc-password-heal
+journalctl -u vlanit-atc-password-heal -b
+# флаг сброса (снимается после успешного самолечения):
+ls /var/lib/vlanit/atc-password-broken 2>/dev/null
+```
+
+Если служба не справилась — ручной обход: задать пароль заново через
+консоль MikoPBX (`podman exec -it mikopbx /etc/rc/console_menu`).
+Регрессионная проверка: `reboot-api-login` в тест-агенте.
 
 
 - `systemctl status mikopbx` — служба Quadlet; генератор:

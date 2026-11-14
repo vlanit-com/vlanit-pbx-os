@@ -50,12 +50,12 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 Форвардинг разрешён только для WireGuard (road-warrior доступ к АТС).
 
 **SSH и вход.** Host-ключи генерируются drop-in'ом `ssh.service.d/00-keygen.conf`
-(`ssh-keygen -A` до старта sshd; с 1.2.7 — ssh.service стартует без падений,
+(`ssh-keygen -A` до старта sshd; с 1.3.0 — ssh.service стартует без падений,
 firstboot-логика осталась идемпотентной подстраховкой). root по SSH запрещён,
 `MaxAuthTries 5`. Консоль — программа `login`, пароль локального администратора
 из мастера.
 
-**Владение файлами (1.2.7).** Вся система — root:root (guard сборки:
+**Владение файлами (1.3.0).** Вся система — root:root (guard сборки:
 файлы uid/gid ≥ 1000 обрывают сборку; сборка только в build-контейнере,
 `make iso`). sudo: root-owned + setuid, с паролем администратора.
 
@@ -94,10 +94,21 @@ firstboot-логика осталась идемпотентной подстр�
   performance baseline, регрессионный веб-QA MikoPBX, WireGuard e2e,
   глубокие проверки apt, интерактивный TUI-прогон, SIP-стресс, soak.
   Спека: `docs/specs/testing-roadmap-t10-t17.md`.
-- **`vlanit-doctor`** (1.3.0) — диагностический скрипт установленной ОС:
-  одна команда сводного контроля здоровья (33 группы проверок от тест-агента),
-  вывод OK/FAIL/SKIP, код возврата, `--fix-hints`, `--json`. Спека:
-  `docs/specs/planned-vlanit-doctor.md`.
+
+## Диагностика на устройстве
+
+**`vlanit-doctor`** (с 1.3.0) — сводный контроль здоровья установленной ОС:
+
+```bash
+vlanit-doctor              # полный отчёт (OK/FAIL/SKIP по группам)
+vlanit-doctor --quiet      # только код возврата 0/1 (для скриптов/мониторинга)
+vlanit-doctor --fix-hints  # под каждой проблемой — команда исправления
+vlanit-doctor --json       # машиночитаемый вывод
+```
+
+Проверки из общей библиотеки `/opt/vlanit/lib/checks.sh` (тот же источник,
+что у QEMU-тест-агента): система, диски/Btrfs, сеть, firewall, SSH, MikoPBX,
+журналы, обновления. Спека: `docs/specs/1.3.0-vlanit-doctor.md`.
 
 ## Требования к сборочной машине
 
@@ -134,7 +145,7 @@ bash scripts/sign-release.sh   # dist/*.iso.sha256 -> .asc
 # с подписанными контрольными суммами (идея #11, см. ниже «Правило релизов»)
 
 # запись на USB (требует root, ДЕСТРУКТИВНО)
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.2.7-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.3.0-amd64.iso /dev/sdX
 # другие способы (dd, GNOME Disks, KDE ISO Image Writer, Rufus, balenaEtcher,
 # macOS dd, Ventoy) — docs/installation.md, раздел «Создание загрузочной флэшки»
 
@@ -145,8 +156,8 @@ make clean          # очистка build/{rootfs,live,iso-staging}, dist
 
 | Путь | Назначение |
 |---|---|
-| `dist/VLANit-PBX-1.2.7-amd64.iso` | итоговый загрузочный ISO (UEFI) |
-| `dist/VLANit-PBX-1.2.7-amd64.iso.sha256` | контрольная сумма |
+| `dist/VLANit-PBX-1.3.0-amd64.iso` | итоговый загрузочный ISO (UEFI) |
+| `dist/VLANit-PBX-1.3.0-amd64.iso.sha256` | контрольная сумма |
 | `build/payload/mikopbx-*.tar.zst` | экспортированный образ MikoPBX (+sha256) |
 | `build/payload/golden.tar.zst` | Golden Image устанавливаемой системы |
 | `build/logs/` | журналы шагов сборки |
@@ -182,4 +193,4 @@ make clean          # очистка build/{rootfs,live,iso-staging}, dist
    sha256sum -c dist/VLANit-PBX-X.Y.Z-amd64.iso.sha256
    ```
 
-   Спека пайплайна: `docs/specs/1.2.7-ci-release.md`.
+   Спека пайплайна: `docs/specs/1.3.0-ci-release.md`.
