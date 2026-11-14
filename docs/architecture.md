@@ -103,7 +103,7 @@ fstab генерируется по UUID. Монтирование: `compress=zs
 | Юнит | Назначение |
 |---|---|
 | `vlanit-firstboot.service` | одноразовая первичная настройка (маркер `/var/lib/vlanit/firstboot-done`) |
-| `vlanit-atc-password-heal.service` | каждая загрузка: самолечение пароля АТС после upstream-сброса (1.3.0, issue #10) |
+| `vlanit-atc-password-heal.service` | каждая загрузка: самолечение пароля АТС после upstream-сброса (1.2.8, issue #10) |
 | `mikopbx.service` | quadlet-служба контейнера MikoPBX |
 | `vlanit-test-agent.service` | только при `VLANIT_TEST=1` в cmdline (QEMU-тесты) |
 | `systemd-timesyncd.service` | NTP-синхронизация (1.2.3; FallbackNTP pool.ntp.org) |

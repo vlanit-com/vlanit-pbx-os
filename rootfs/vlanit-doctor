@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /usr/local/sbin/vlanit-doctor — сводная диагностика установленной VLANit PBX OS
-# (issue #9, спека: docs/specs/1.3.0-vlanit-doctor.md).
+# (issue #9, спека: docs/specs/1.2.8-vlanit-doctor.md).
 #
 #   vlanit-doctor              — полный отчёт (OK/FAIL/SKIP по группам)
 #   vlanit-doctor --quiet      — только код возврата (0 = всё зелёное)
