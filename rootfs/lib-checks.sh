@@ -251,9 +251,8 @@ hint_apt-upgradable() { echo "apt-get upgrade; unattended-upgrades"; }
 
 desc_pre-update-snapshot() { echo "есть pre-update снапшот (откат)"; }
 check_pre-update-snapshot() {
-    local lst
-    lst="$(/opt/vlanit/vlanit-snapshot list 2>/dev/null)"
-    [ -z "$lst" ] && return 2   # снапшотов ещё нет (свежая установка)
-    echo "$lst" | grep -q 'pre-update'
+    # норма: снапшот создаётся ПЕРЕД обновлением (vlanit-update). На свежей
+    # системе без обновлений его нет — это SKIP, а не FAIL
+    /opt/vlanit/vlanit-snapshot list 2>/dev/null | grep -q 'pre-update' || return 2
 }
 hint_pre-update-snapshot() { echo "/opt/vlanit/vlanit-snapshot create manual"; }

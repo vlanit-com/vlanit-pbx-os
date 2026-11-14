@@ -30,9 +30,15 @@ for i in $(seq 1 120); do
 done
 
 login_ok() {
-    curl -sk --max-time 10 -X POST https://127.0.0.1/pbxcore/api/v3/auth:login \
-        -H 'Content-Type: application/json' \
-        -d "{\"login\":\"admin\",\"password\":\"$PW\"}" | grep -q accessToken
+    # ретраи: DockerCloud применяет env асинхронно после баннера готовности
+    local i
+    for i in 1 2 3; do
+        curl -sk --max-time 10 -X POST https://127.0.0.1/pbxcore/api/v3/auth:login \
+            -H 'Content-Type: application/json' \
+            -d "{\"login\":\"admin\",\"password\":\"$PW\"}" | grep -q accessToken && return 0
+        [ "$i" -lt 3 ] && sleep 10
+    done
+    return 1
 }
 
 # часовой пояс АТС = пояс устройства (issue #18): TZ/localtime проброшены
@@ -64,15 +70,18 @@ touch /var/lib/vlanit/atc-password-broken
 for i in 1 2 3; do
     HEAL="$(curl -sk --max-time 15 -X PATCH https://127.0.0.1/pbxcore/api/v3/general-settings \
         -H 'Content-Type: application/json' \
+        -w '\nHTTP:%{http_code}' \
         -d "{\"WEB_ADMIN_PASSWORD\":\"$PW\"}")"
-    echo "$HEAL" | grep -q '"result":true' || {
-        log "попытка $i: PATCH отклонён: $(echo "$HEAL" | head -c 160)"
+    echo "$HEAL" | grep -qE '"result": ?true' || {
+        log "попытка $i: PATCH отклонён: $(echo "$HEAL" | tr -d '\n' | head -c 200)"
         sleep 10
         continue
     }
-    # асинхронное применение: ждём, пока логин начнёт проходить (до 60 с)
-    for j in $(seq 1 12); do
-        if login_ok; then
+    # асинхронное применение: ждём, пока логин начнёт проходить (до 90 с)
+    for j in $(seq 1 18); do
+        if curl -sk --max-time 10 -X POST https://127.0.0.1/pbxcore/api/v3/auth:login \
+                -H 'Content-Type: application/json' \
+                -d "{\"login\":\"admin\",\"password\":\"$PW\"}" | grep -q accessToken; then
             log "самолечение успешно: пароль quadlet применён и проверен"
             rm -f /var/lib/vlanit/atc-password-broken
             sync_timezone
