@@ -102,6 +102,11 @@ EOF
         echo '$admin_user:$encrypted' | chpasswd -e
     " || die "не удалось создать администратора"
 
+    # SSH host keys — генерируем ПРИ УСТАНОВКЕ (уникальны на устройстве,
+    # в Golden Image их нет): sshd стартует с первой загрузки без падений
+    # (issue #17). Drop-in 00-keygen остаётся подстраховкой.
+    chroot "$SYS_MNT" /usr/bin/ssh-keygen -A || die "не удалось сгенерировать SSH host keys"
+
     if [ "$ssh_enabled" = "yes" ]; then
         chroot "$SYS_MNT" systemctl enable ssh.service || true
     else
@@ -110,7 +115,7 @@ EOF
 }
 
 configure_target_mikopbx() {
-    local pbx_name="$1" admin_login="$2" admin_pass="$3"
+    local pbx_name="$1" admin_login="$2" admin_pass="$3" tz="${4:-Europe/Moscow}"
     local quadlet="$SYS_MNT/etc/containers/systemd/mikopbx.container"
     [ -f "$quadlet" ] || die "quadlet-файл отсутствует в Golden Image"
     # блок VLANIT-ENV (идемпотентно, маркеры совместимы с vlanit-provision).
@@ -132,20 +137,28 @@ configure_target_mikopbx() {
     case "$pids_limit"   in ''|*[!0-9]*) pids_limit=8192  ;; esac
     sed -i -E "s/^StopTimeout=.*/StopTimeout=$stop_timeout/" "$quadlet"
     sed -i -E "s/^PidsLimit=.*/PidsLimit=$pids_limit/" "$quadlet"
-    python3 - "$quadlet" "$pbx_name" "$admin_login" "$admin_pass" <<'PYEOF'
+    python3 - "$quadlet" "$pbx_name" "$admin_login" "$admin_pass" "$tz" <<'PYEOF'
 import sys
 sys.path.insert(0, "/opt/vlanit/provisioning")  # live-среда: общий модуль
 import vlanit_quadlet
 
-path, name, login, passwd = sys.argv[1:5]
-# общая реализация блока VLANIT-ENV с vlanit-provision (ponytail #25)
+path, name, login, passwd, tz = sys.argv[1:6]
+# общая реализация блока VLANIT-ENV с vlanit-provision (ponytail #25).
+# Пароль НЕ пишем в quadlet — он уезжает в Podman secret (см. Secret= в
+# шаблоне); firstboot создаёт секрет из /etc/vlanit/atc-admin-password.
 vlanit_quadlet.write_env_block(path, [
     ("PBX_NAME", name),
     ("WEB_ADMIN_LOGIN", login),
-    ("WEB_ADMIN_PASSWORD", passwd),
+    # часовой пояс АТС = пояс устройства (issue #18; /etc/localtime тоже
+    # проброшен в контейнер — TZ задаёт системный пояс внутри)
+    ("TZ", tz),
 ])
 PYEOF
-    chmod 600 "$quadlet"   # пароль веб-админа — только root (cso #1)
+    chmod 600 "$quadlet"
+    # пароль веб-админа: root-600 файл -> Podman secret (firstboot создаст)
+    install -d -m 0700 "$SYS_MNT/etc/vlanit"
+    printf '%s' "$admin_pass" > "$SYS_MNT/etc/vlanit/atc-admin-password"
+    chmod 600 "$SYS_MNT/etc/vlanit/atc-admin-password"
 }
 
 # chroot-операции: initramfs + загрузчик

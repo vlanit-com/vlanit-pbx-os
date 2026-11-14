@@ -17,9 +17,9 @@ CHECK_GROUPS=(
     "system:hostname timezone-set timesyncd apt-security-source unattended-upgrades"
     "disks:btrfs-root btrfs-subvol-mikopbx-cf fstab-uuid btrfs-snapshot-list disk-space"
     "network:networkd-active network-address dns-resolve wireguard-active"
-    "firewall:nft-active nft-policy-drop nft-no-testnet ports-listening"
+    "firewall:nft-active nft-policy-drop nft-no-testnet nft-localhost-root-only ports-listening"
     "ssh:ssh-host-keys ssh-service-active security-root-ssh-denied security-fail2ban bin-login-present"
-    "mikopbx:quadlet-service mikopbx-service-active mikopbx-image-version mikopbx-cf-nonempty atc-ssh-port-23 atc-password-nonempty atc-env-in-container atc-stop-timeout pids-limit mikopbx-webui mikopbx-api-login"
+    "mikopbx:quadlet-service mikopbx-service-active mikopbx-image-version mikopbx-cf-nonempty atc-ssh-port-23 atc-password-nonempty atc-secret-exists atc-no-plaintext-in-quadlet atc-env-in-container atc-stop-timeout pids-limit mikopbx-webui mikopbx-api-login"
     "logs:journal-persistent journal-last-boot"
     "updates:apt-upgradable pre-update-snapshot"
 )
@@ -105,6 +105,12 @@ desc_nft-policy-drop() { echo "политика input: default drop"; }
 check_nft-policy-drop() { nft list ruleset 2>/dev/null | grep -q 'policy drop'; }
 hint_nft-policy-drop() { echo "nft -f /etc/nftables.conf"; }
 
+desc_nft-localhost-root-only() { echo "API АТС с loopback — только root (skuid)"; }
+check_nft-localhost-root-only() {
+    nft list ruleset 2>/dev/null | grep -q 'skuid != 0'
+}
+hint_nft-localhost-root-only() { echo "проверьте /etc/nftables.conf (meta skuid != 0 drop)"; }
+
 desc_nft-no-testnet() { echo "нет тестовой подсети 10.0.2.0/24 в правилах"; }
 check_nft-no-testnet() { ! nft list ruleset 2>/dev/null | grep -q '10\.0\.2\.0/24'; }
 hint_nft-no-testnet() { echo "проверьте /etc/nftables.conf"; }
@@ -161,9 +167,20 @@ desc_atc-ssh-port-23() { echo "SSH АТС на порту 23"; }
 check_atc-ssh-port-23() { podman exec mikopbx sh -c 'test "$SSH_PORT" = 23' 2>/dev/null; }
 hint_atc-ssh-port-23() { echo "проверьте Environment=SSH_PORT в quadlet"; }
 
-desc_atc-password-nonempty() { echo "пароль веб-админа АТС задан (не пустой)"; }
-check_atc-password-nonempty() { grep -q 'WEB_ADMIN_PASSWORD=..' /etc/containers/systemd/mikopbx.container 2>/dev/null; }
-hint_atc-password-nonempty() { echo "задайте WEB_ADMIN_PASSWORD в quadlet"; }
+desc_atc-password-nonempty() { echo "пароль веб-админа АТС задан (root-600 файл)"; }
+check_atc-password-nonempty() {
+    [ -s /etc/vlanit/atc-admin-password ] || return 1
+    [ "$(stat -c %a /etc/vlanit/atc-admin-password)" = "600" ]
+}
+hint_atc-password-nonempty() { echo "файл создаёт установщик; см. troubleshooting"; }
+
+desc_atc-secret-exists() { echo "Podman secret atc-admin-password создан"; }
+check_atc-secret-exists() { podman secret exists atc-admin-password 2>/dev/null; }
+hint_atc-secret-exists() { echo "podman secret create atc-admin-password /etc/vlanit/atc-admin-password"; }
+
+desc_atc-no-plaintext-in-quadlet() { echo "пароля открытым текстом нет в quadlet"; }
+check_atc-no-plaintext-in-quadlet() { ! grep -q 'WEB_ADMIN_PASSWORD=' /etc/containers/systemd/mikopbx.container 2>/dev/null; }
+hint_atc-no-plaintext-in-quadlet() { echo "пароль должен быть в Podman secret, не в юните"; }
 
 desc_atc-env-in-container() { echo "env мастера дошли до контейнера"; }
 check_atc-env-in-container() { podman exec mikopbx sh -c 'env | grep -q ^WEB_ADMIN_PASSWORD=' 2>/dev/null; }
@@ -197,9 +214,8 @@ hint_mikopbx-webui() { echo "podman logs mikopbx | tail; curl -k https://<ip>/";
 
 desc_mikopbx-api-login() { echo "API-логин паролем из quadlet (localhost)"; }
 check_mikopbx-api-login() {
-    local pw
-    pw="$(sed -n 's/^Environment=WEB_ADMIN_PASSWORD=//p' /etc/containers/systemd/mikopbx.container 2>/dev/null | head -1)"
-    pw="${pw%\"}"; pw="${pw#\"}"
+    local pw=""
+    [ -s /etc/vlanit/atc-admin-password ] && pw="$(cat /etc/vlanit/atc-admin-password)"
     [ -n "$pw" ] || return 2
     # известный upstream-баг (#10): после reboot хэш может быть сброшен —
     # FAIL трактуется как известная проблема (см. troubleshooting)

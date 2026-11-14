@@ -250,7 +250,7 @@ write_target_network "$SYS_MNT" "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "
 if [ "$WG_ENABLED" = "yes" ]; then
     configure_target_wireguard "$WG_ADDR" "$WG_PORT" "$WG_PEERS_FILE"
 fi
-configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$PBX_ADMIN_PASS"
+configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$PBX_ADMIN_PASS" "$TZ_NAME"
 import_mikopbx_image
 post_install_report "$TARGET_DISK"
 install_bootloader

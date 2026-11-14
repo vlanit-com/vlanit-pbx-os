@@ -13,11 +13,12 @@ set -uo pipefail
 LOG_TAG="vlanit-atc-heal"
 log() { logger -t "$LOG_TAG" -- "$*"; echo "[$LOG_TAG] $*"; }
 
-QUADLET="/etc/containers/systemd/mikopbx.container"
-PW="$(sed -n 's/^Environment=WEB_ADMIN_PASSWORD=//p' "$QUADLET" 2>/dev/null | head -1)"
-PW="${PW%\"}"; PW="${PW#\"}"
+# источник пароля: root-600 файл (Podman secret), НЕ quadlet (секьюрити-фидбек)
+PW_FILE="/etc/vlanit/atc-admin-password"
+PW=""
+[ -s "$PW_FILE" ] && PW="$(cat "$PW_FILE")"
 if [ -z "$PW" ]; then
-    log "WEB_ADMIN_PASSWORD в quadlet не задан — нечего лечить, выход"
+    log "пароль веб-админа отсутствует (/etc/vlanit/atc-admin-password) — нечего лечить, выход"
     exit 0
 fi
 
@@ -34,9 +35,25 @@ login_ok() {
         -d "{\"login\":\"admin\",\"password\":\"$PW\"}" | grep -q accessToken
 }
 
+# часовой пояс АТС = пояс устройства (issue #18): TZ/localtime проброшены
+# в контейнер, а настройка PBXTimezone применяется через REST v3
+# (PATCH /pbxcore/api/v3/time-settings, localhost bypass)
+sync_timezone() {
+    local tz
+    tz="$(cat /etc/timezone 2>/dev/null)"
+    [ -z "$tz" ] && return 0
+    local cur
+    cur="$(curl -sk --max-time 10 https://127.0.0.1/pbxcore/api/v3/time-settings 2>/dev/null         | sed -n 's/.*"PBXTimezone":"\([^"]*\)".*/\1/p' | head -1)"
+    if [ "$cur" != "$tz" ]; then
+        log "выравнивание часового пояса АТС: $cur -> $tz"
+        curl -sk --max-time 15 -X PATCH https://127.0.0.1/pbxcore/api/v3/time-settings             -H 'Content-Type: application/json'             -d "{\"PBXTimezone\":\"$tz\"}" >/dev/null 2>&1 ||             log "WARN: не удалось применить PBXTimezone через API"
+    fi
+}
+
 if login_ok; then
     log "пароль веб-админа в порядке"
     rm -f /var/lib/vlanit/atc-password-broken
+    sync_timezone
     exit 0
 fi
 
@@ -58,6 +75,7 @@ for i in 1 2 3; do
         if login_ok; then
             log "самолечение успешно: пароль quadlet применён и проверен"
             rm -f /var/lib/vlanit/atc-password-broken
+            sync_timezone
             exit 0
         fi
         sleep 5

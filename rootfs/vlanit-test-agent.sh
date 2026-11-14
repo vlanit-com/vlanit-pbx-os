@@ -126,6 +126,7 @@ check "ssh-host-keys" sh -c '
 check "nft-policy-drop" lib
 # тестовая подсеть QEMU не должна уезжать в образ (полевой дефект 1.2.4 #2)
 check "nft-no-testnet" lib
+check "nft-localhost-root-only" lib
 # файлы системы — root, а не uid сборочного пользователя (дефект 1.2.4 #1);
 # /home исключён (домашний каталог администратора legitimately uid 1000)
 check "files-root-owned" sh -c "test \"\$(find / -xdev -uid 1000 -not -path '/home/*' 2>/dev/null | wc -l)\" -eq 0"
@@ -139,6 +140,10 @@ check "handle-power-key" sh -c "busctl get-property org.freedesktop.login1 /org/
 check "vlanit-doctor" sh -c "vlanit-doctor --quiet"
 # issue #10: служба самолечения пароля АТС включена и отработала
 check "atc-heal-service" sh -c "systemctl is-enabled --quiet vlanit-atc-password-heal.service"
+check "atc-secret-exists" lib
+check "atc-no-plaintext-in-quadlet" lib
+check "atc-dockerenv-mount" sh -c "podman inspect mikopbx --format '{{range .Mounts}}{{.Destination}} {{end}}' | grep -q '/.dockerenv'"
+check "atc-tz-env" sh -c "podman exec mikopbx sh -c 'test -n \"\$TZ\"'"
 # journal-persistent проверяется после reboot-фазы (см. ниже)
 
 # --- перезагрузка и проверка сохранения (Т4: автозапуск после reboot) ---
@@ -164,8 +169,8 @@ if [ -f /var/spool/mikopbx/storage/.vlanit-reboot-marker ]; then
         podman logs mikopbx 2>/dev/null | grep -q "All services are fully loaded welcome" && break
         sleep 5
     done
-    PW="$(sed -n 's/^Environment=WEB_ADMIN_PASSWORD=//p' /etc/containers/systemd/mikopbx.container | head -1)"
-    PW="${PW%\"}"; PW="${PW#\"}"
+    PW=""
+    [ -s /etc/vlanit/atc-admin-password ] && PW="$(cat /etc/vlanit/atc-admin-password)"
     if curl -sk --max-time 10 -X POST https://127.0.0.1/pbxcore/api/v3/auth:login \
             -H 'Content-Type: application/json' \
             -d "{\"login\":\"admin\",\"password\":\"$PW\"}" | grep -q accessToken; then

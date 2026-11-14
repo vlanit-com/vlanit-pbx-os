@@ -48,6 +48,17 @@ else
     log "образ $IMAGE_REF уже присутствует"
 fi
 
+# Podman secret с паролем веб-админа (секьюрити-фидбек): quadlet ссылается
+# на Secret=atc-admin-password; источник — root-600 файл от установщика
+if ! podman secret exists atc-admin-password 2>/dev/null; then
+    if [ -s /etc/vlanit/atc-admin-password ]; then
+        log "создание Podman secret atc-admin-password"
+        podman secret create atc-admin-password /etc/vlanit/atc-admin-password ||             log "WARN: не удалось создать secret — контейнер не стартует"
+    else
+        log "WARN: /etc/vlanit/atc-admin-password отсутствует — создайте secret вручную"
+    fi
+fi
+
 # активация quadlet-службы MikoPBX
 systemctl daemon-reload
 if systemctl cat mikopbx.service >/dev/null 2>&1; then

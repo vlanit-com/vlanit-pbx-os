@@ -14,9 +14,22 @@ Network=host
 AddCapability=NET_ADMIN
 Volume=/var/spool/mikopbx/cf:/cf
 Volume=/var/spool/mikopbx/storage:/storage
+# /.dockerenv: маркер Docker-среды для provisioning MikoPBX (issue #10):
+# DockerCloud проверяет его наличие (System::isDocker) и без файла НЕ
+# применяет env вообще (имя/порты/пароль из мастера). Пустой файл-заглушка,
+# upstream: mikopbx/Core#1104. Значения в [Container] при этом видны в
+# podman exec mikopbx env, но provisioning без маркера не стартует.
+Volume=/var/lib/vlanit/dockerenv:/.dockerenv:ro
+# часовой пояс АТС = часовой пояс устройства (issue #18)
+Volume=/etc/localtime:/etc/localtime:ro
 Environment=ID_WWW_USER=1001
 Environment=ID_WWW_GROUP=1001
 Environment=SSH_PORT=23
+# пароль веб-админа — Podman secret (секьюрити-фидбек): в юните и в
+# podman inspect открытым текстом не хранится. Секрет создаёт firstboot
+# из /etc/vlanit/atc-admin-password (0600), target=ENV — DockerCloud
+# provisioning читает его как обычный env WEB_ADMIN_PASSWORD.
+Secret=atc-admin-password,type=env,target=WEB_ADMIN_PASSWORD
 
 PidsLimit=8192
 # лимит времени на остановку контейнера (SIGTERM -> SIGKILL): MikoPBX

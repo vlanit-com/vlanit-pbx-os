@@ -123,6 +123,11 @@ install -D -m 0755 "$PROJECT_ROOT/snapshots/vlanit-rollback" \
     "$ROOTFS/usr/local/sbin/vlanit-rollback"
 install -D -m 0755 "$PROJECT_ROOT/snapshots/vlanit-backup" \
     "$ROOTFS/usr/local/sbin/vlanit-backup"
+# маркер Docker-среды для provisioning MikoPBX (issue #10): монтируется
+# в контейнер как /.dockerenv:ro; без него DockerCloud не применяет env
+install -d -m 0755 "$ROOTFS/var/lib/vlanit"
+touch "$ROOTFS/var/lib/vlanit/dockerenv"
+
 # диагностика (issue #9): doctor + общая библиотека проверок
 install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-doctor" \
     "$ROOTFS/usr/local/sbin/vlanit-doctor"

@@ -6,6 +6,18 @@
 
 ## 1.2.8 (2026-11-14)
 
+- **Provisioning MikoPBX починен корнем** (issue #10, полевой фидбек):
+  маркер `/.dockerenv:ro` (пустой файл) — без него DockerCloud вообще не
+  применяет env (имя/порты/пароль из мастера). Upstream: mikopbx/Core#1104.
+- **SSH host keys генерируются при установке** (issue #17): sshd стартует
+  с первой загрузки без падений; drop-in сбрасывает ExecStartPre и ставит
+  `ssh-keygen -A` до `sshd -t`.
+- **Часовой пояс АТС = пояс устройства** (issue #18): `/etc/localtime` и
+  `TZ` проброшены в контейнер, heal выравнивает `PBXTimezone` через
+  REST v3 (time-settings).
+- **Безопасность** (фидбек, не issue): пароль веб-админа убран из quadlet
+  в Podman secret (`Secret=`, источник — `/etc/vlanit/atc-admin-password`
+  0600); API АТС с loopback без токена ограничен root (`meta skuid != 0`).
 - **`vlanit-doctor`** — диагностическая команда на установленном устройстве
   (issue #9): сводный контроль здоровья по группам (система, диски/Btrfs,
   сеть, firewall, SSH, MikoPBX, журналы, обновления), вывод OK/FAIL/SKIP,
