@@ -6,31 +6,30 @@
 
 ## 1.2.8 (2026-11-14)
 
-- **Provisioning MikoPBX починен корнем** (issue #10, полевой фидбек):
-  маркер `/.dockerenv:ro` (пустой файл) — без него DockerCloud вообще не
-  применяет env (имя/порты/пароль из мастера). Upstream: mikopbx/Core#1104.
-- **SSH host keys генерируются при установке** (issue #17): sshd стартует
+- Provisioning MikoPBX: маркер `/.dockerenv:ro` (issue #10, полевой
+  фидбек). Без него DockerCloud не применяет env (имя/порты/пароль из
+  мастера). Upstream: mikopbx/Core#1104.
+- SSH host keys генерируются при установке (issue #17): sshd стартует
   с первой загрузки без падений; drop-in сбрасывает ExecStartPre и ставит
   `ssh-keygen -A` до `sshd -t`.
-- **Часовой пояс АТС = пояс устройства** (issue #18): `/etc/localtime` и
+- Часовой пояс АТС = пояс устройства (issue #18): `/etc/localtime` и
   `TZ` проброшены в контейнер, heal выравнивает `PBXTimezone` через
   REST v3 (time-settings).
-- **Безопасность** (фидбек, не issue): пароль веб-админа убран из quadlet
+- Безопасность (фидбек, не issue): пароль веб-админа перенесён из quadlet
   в Podman secret (`Secret=`, источник — `/etc/vlanit/atc-admin-password`
   0600); API АТС с loopback без токена ограничен root (`meta skuid != 0`).
-- **`vlanit-doctor`** — диагностическая команда на установленном устройстве
-  (issue #9): сводный контроль здоровья по группам (система, диски/Btrfs,
-  сеть, firewall, SSH, MikoPBX, журналы, обновления), вывод OK/FAIL/SKIP,
-  `--quiet` / `--fix-hints` / `--json`, код возврата 0/1. Общая библиотека
-  проверок `/opt/vlanit/lib/checks.sh` — один источник правды с QEMU-агентом
-  (агент рефакторен на неё; unit-тесты tests/unit/test-doctor-lib.sh).
-- **Самолечение пароля веб-админа АТС** (issue #10, обход upstream-бага
+- `vlanit-doctor` (issue #9): диагностика установленной системы по
+  группам (система, диски/Btrfs, сеть, firewall, SSH, MikoPBX, журналы,
+  обновления), вывод OK/FAIL/SKIP, `--quiet` / `--fix-hints` / `--json`,
+  код возврата 0/1. Проверки агента и doctor читают одну библиотеку
+  `/opt/vlanit/lib/checks.sh`; unit-тесты tests/unit/test-doctor-lib.sh.
+- Самолечение пароля веб-админа АТС (issue #10, обход upstream-бага
   MikoPBX): служба `vlanit-atc-password-heal` на каждой загрузке проверяет
-  логин паролем из quadlet и при сбросе повторно применяет пароль через
-  REST v3 (PATCH general-settings, localhost bypass).
+  логин паролем из quadlet и при сбросе применяет пароль через REST v3
+  (PATCH general-settings, localhost bypass).
 - Ядро 6.12.117+deb13-amd64.
 
-Тестирование (QEMU/KVM, UEFI): 44 проверки агента PASS.
+Тестирование (QEMU/KVM, UEFI): 49 проверок агента PASS, 0 WARN.
 
 ## 1.2.7 (2026-11-14)
 
