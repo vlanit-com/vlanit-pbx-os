@@ -7,11 +7,13 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build"
 STAGING="$BUILD_DIR/iso-staging"
 PAYLOAD_SRC="$PROJECT_ROOT/build/payload"
-# staging очищаем ПЕРЕД наполнением: иначе файлы удалённые из репо
-# (например, config/defaults.yaml, удалённый в #21) навсегда оседают в ISO
-# — найдено аудитом размера 1.2.8
-rm -rf "$STAGING"
-mkdir -p "$STAGING/payload"
+# чистим ТОЛЬКО каталоги, которые наполняются на этом шаге и позже.
+# staging/live наполняется шагом 30-initramfs — его трогать нельзя
+# (иначе в ISO без vmlinuz/initrd/squashfs, найдено сборкой 1.2.9).
+# Удалённые из репо файлы (config/defaults.yaml, #21) оседали именно в
+# payload — чистка payload достаточна.
+rm -rf "$STAGING/payload" "$STAGING/boot"
+mkdir -p "$STAGING/payload" "$STAGING/boot/grub"
 
 log() { printf '[staging] %s\n' "$*"; }
 

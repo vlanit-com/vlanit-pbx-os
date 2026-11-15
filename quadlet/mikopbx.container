@@ -3,7 +3,7 @@
 [Unit]
 Description=MikoPBX (VLANit PBX OS)
 Documentation=https://docs.mikopbx.com
-After=network-online.target vlanit-firstboot.service
+After=network-online.target vlanit-atc-secret.service
 Wants=network-online.target
 
 [Container]

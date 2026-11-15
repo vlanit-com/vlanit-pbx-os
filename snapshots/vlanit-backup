@@ -58,7 +58,12 @@ done
 log "копирование данных"
 tar -C / --zstd -cpf "$OUT_TMP/data.tar.zst" \
     var/spool/mikopbx/cf var/spool/mikopbx/storage || die "архивация данных не удалась"
-tar -C / --zstd -cpf "$OUT_TMP/system-etc.tar.zst" etc || die "архивация /etc не удалась"
+# /etc/vlanit/atc-admin-password ИСКЛЮЧЁН: пароль веб-админа АТС не должен
+# уезжать на USB-носитель бэкапа (секьюрити-фидбек). После восстановления
+# пароль ротируется автоматически (vlanit-atc-secret генерирует новый,
+# provisioning MikoPBX применит его из env при старте контейнера).
+tar -C / --zstd -cpf "$OUT_TMP/system-etc.tar.zst" \
+    --exclude='etc/vlanit/atc-admin-password' etc || die "архивация /etc не удалась"
 sha256sum "$OUT_TMP/data.tar.zst" "$OUT_TMP/system-etc.tar.zst" > "$OUT_TMP/SHA256SUMS"
 cat > "$OUT_TMP/backup-manifest.json" <<EOF
 {
