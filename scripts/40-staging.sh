@@ -7,6 +7,10 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build"
 STAGING="$BUILD_DIR/iso-staging"
 PAYLOAD_SRC="$PROJECT_ROOT/build/payload"
+# staging очищаем ПЕРЕД наполнением: иначе файлы удалённые из репо
+# (например, config/defaults.yaml, удалённый в #21) навсегда оседают в ISO
+# — найдено аудитом размера 1.2.8
+rm -rf "$STAGING"
 mkdir -p "$STAGING/payload"
 
 log() { printf '[staging] %s\n' "$*"; }
