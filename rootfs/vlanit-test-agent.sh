@@ -47,7 +47,14 @@ check "btrfs-snapshot-list" sh -c "/opt/vlanit/vlanit-snapshot list | grep -q te
 # --- зеркало двух дисков (маркер VLANIT_MIRROR=1 — только тест-профиль) ---
 if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
     check "mirror-raid1-layout" sh -c "lvs --noheadings -o lv_layout vg0 2>/dev/null | grep -q raid1"
-    npv_vg0="$(pvs --noheadings -o pv_name vg0 2>/dev/null | wc -l)"
+    # lvm userspace на ранней загрузке может не видеть PV — ждём до 60 с;
+    # полное зеркло = 2 PV, 1 PV после таймаута = деградация (ожидаемо в фазе degraded)
+    npv_vg0=0
+    for _ in $(seq 1 12); do
+        npv_vg0="$(pvs --noheadings -o pv_name vg0 2>/dev/null | wc -l)"
+        [ "$npv_vg0" -ge 2 ] && break
+        sleep 5
+    done
     if [ "$npv_vg0" -ge 2 ]; then
         # полное зеркло: оба лега на месте, второй ESP присутствует
         check "mirror-health" sh -c "! lvs --noheadings -o lv_health_status vg0 2>/dev/null | grep -qE '[^[:space:]-]'"

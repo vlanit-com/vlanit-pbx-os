@@ -64,12 +64,20 @@ hint_btrfs-snapshot-list() { echo "/opt/vlanit/vlanit-snapshot list"; }
 
 # LVM-схема vg0 (root/data поверх LV; спека mirror-two-disk).
 # Legacy-системы (Btrfs прямо на разделах, до LVM) — валидны: SKIP.
+# Retry: на ранней загрузке lvm userspace может ещё не видеть PV
+# (стенд mirror: findmnt уже показывает mapper, lvs — ещё пуст, ~83 с boot).
 desc_lvm-layout() { echo "хранилище на LVM (vg0/root, vg0/data)"; }
 check_lvm-layout() {
     if findmnt -n -o SOURCE / | grep -q "^/dev/mapper/${VG_NAME:-vg0}-"; then
-        lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx root \
-            && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx data
-        return
+        local i
+        for i in 1 2 3 4 5 6; do
+            if lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx root \
+               && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx data; then
+                return 0
+            fi
+            sleep 5
+        done
+        return 1
     fi
     findmnt -n -o FSTYPE / 2>/dev/null | grep -q btrfs && return 2
     return 1
