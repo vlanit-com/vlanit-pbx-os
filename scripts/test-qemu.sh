@@ -128,7 +128,16 @@ run_qemu() {
 
 kill_qemu() {
     local pidfile="$TESTDIR/$1.pid"
-    [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null || true
+    [ -f "$pidfile" ] || return 0
+    local pid; pid="$(cat "$pidfile")"
+    kill "$pid" 2>/dev/null || true
+    # дожидаемся освобождения образов (write-lock qcow2): installer делает
+    # reboot -f сразу после маркера, SIGTERM может обрабатываться долго
+    for _ in $(seq 1 30); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+    done
+    kill -9 "$pid" 2>/dev/null || true
     sleep 1
     rm -f "$pidfile"
 }
