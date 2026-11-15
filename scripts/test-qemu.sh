@@ -33,6 +33,12 @@ DISK_SIZE_GB="${DISK_SIZE_GB:-64}"
 [ -f "$ISO" ] || { echo "Нет $ISO — выполните make iso"; exit 1; }
 [ -f "$OVMF_CODE" ] || { echo "Нет OVMF — скачайте пакет ovmf в tools/"; exit 1; }
 [ -f "$EFI_IMG" ] || { echo "Нет $EFI_IMG — сборка ISO не завершена корректно"; exit 1; }
+
+# preflight: место на диске хоста. qcow2 разрастаются в процессе установки;
+# переполнение хост-ФС даёт бесшумный I/O-сталл внутри ВМ (установка
+# «виснет» без диагностики — найдено стендом mirror, 15.11.2026).
+avail_mb="$(df -m --output=avail "$PROJECT_ROOT" | tail -1 | tr -dc '0-9')"
+[ "${avail_mb:-0}" -ge 20480 ] || die "мало места на диске: нужно ≥20 ГБ свободно (сейчас $(( ${avail_mb:-0} / 1024 )) ГБ)"
 mkdir -p "$TESTDIR"
 
 FAILED=0

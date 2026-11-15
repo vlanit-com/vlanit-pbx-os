@@ -194,18 +194,29 @@ PYEOF
 # $1 — (опционально) второй диск зеркала: ESP-B + UEFI-запись на него.
 install_bootloader() {
     local disk_b="${1:-}"
-    log "подготовка initramfs и GRUB (chroot)"
     mount_chroot_fs
-    chroot "$SYS_MNT" /bin/sh -c "
-        export DEBIAN_FRONTEND=noninteractive
-        update-initramfs -u -k all
-        grub-install --target=x86_64-efi --efi-directory=/boot/efi \
-            --bootloader-id=VLANIT --recheck
-        # fallback-загрузка (слабые firmware без надёжного NVRAM)
-        mkdir -p /boot/efi/EFI/BOOT
-        cp /boot/efi/EFI/VLANIT/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.efi
-        grub-mkconfig -o /boot/grub/grub.cfg
-    " || die "сбой установки загрузчика"
+
+    log "update-initramfs (chroot)"
+    chroot "$SYS_MNT" /bin/sh -c \
+        "export DEBIAN_FRONTEND=noninteractive; update-initramfs -u -k all" \
+        || die "сбой update-initramfs"
+
+    log "grub-install (chroot, ESP-A)"
+    chroot "$SYS_MNT" /bin/sh -c \
+        "grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+            --bootloader-id=VLANIT --recheck" \
+        || die "сбой grub-install"
+
+    log "fallback BOOTX64 (chroot)"
+    chroot "$SYS_MNT" /bin/sh -c \
+        "mkdir -p /boot/efi/EFI/BOOT && \
+         cp /boot/efi/EFI/VLANIT/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.efi" \
+        || die "сбой записи fallback BOOTX64"
+
+    log "grub-mkconfig (chroot)"
+    chroot "$SYS_MNT" /bin/sh -c \
+        "grub-mkconfig -o /boot/grub/grub.cfg" \
+        || die "сбой grub-mkconfig"
 
     if [ -n "$disk_b" ]; then
         # ESP-B: байт-в-байт копия ESP-A — диск B самодостаточен
