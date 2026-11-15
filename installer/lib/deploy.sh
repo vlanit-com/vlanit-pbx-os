@@ -29,6 +29,18 @@ create_storage() {
         log "LV: root ${sys_mib}MiB, data ${data_mib}MiB (raid1, мин. диск)"
         lvcreate -y --type raid1 -m 1 -n root -L "${sys_mib}M" "$VG_NAME" || die "lvcreate root (raid1) не выполнен"
         lvcreate -y --type raid1 -m 1 -n data -L "${data_mib}M" "$VG_NAME" || die "lvcreate data (raid1) не выполнен"
+        # Гонка initial sync dm-raid1 с последующими записами (развёртывание
+        # golden, chroot) вешала установку нестабильно (стенд mirror, #8:
+        # 20+ мин без прогресса, хост idle). Ставим golden только на
+        # полностью синхронизированное зеркало.
+        log "ожидание начальной синхронизации RAID1 (до 10 мин)"
+        for i in $(seq 1 120); do
+            unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | awk '$1!="100.00"' | wc -l)"
+            [ "$unsynced" -eq 0 ] && break
+            sleep 5
+        done
+        [ "$unsynced" -eq 0 ] || die "RAID1 не синхронизировался за 10 минут"
+        log "RAID1 синхронизирован"
     else
         vgcreate -y "$VG_NAME" "$(partition_device "$disk_a" 2)" || die "vgcreate не выполнен"
         log "LV: root ${sys_mib}MiB, data — остаток (linear)"
