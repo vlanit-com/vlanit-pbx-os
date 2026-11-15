@@ -71,8 +71,12 @@ check_lvm-layout() {
     if findmnt -n -o SOURCE / | grep -q "^/dev/mapper/${VG_NAME:-vg0}-"; then
         local i
         for i in 1 2 3 4 5 6; do
-            if lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx root \
-               && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx data; then
+            # --noheadings сохраняет паддинг («  root») — точное совпадение
+            # через trim, иначе проверка ложно падает (дефект найден стендом mirror)
+            if lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null \
+                    | sed 's/^ *//; s/ *$//' | grep -qx root \
+               && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null \
+                    | sed 's/^ *//; s/ *$//' | grep -qx data; then
                 return 0
             fi
             sleep 5
