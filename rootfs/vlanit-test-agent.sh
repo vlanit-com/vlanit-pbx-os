@@ -57,17 +57,21 @@ if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
         head -3 /proc/mdstat 2>/dev/null
     } | while read -r dl; do out "DIAG $dl"; done
     check "mirror-raid1-layout" sh -c "lvs --noheadings -o lv_layout vg0 2>/dev/null | grep -q raid1"
-    # lvm userspace на ранней загрузке может не видеть PV — ждём до 60 с.
-    # Счётчик PV — через vgs pv_count: pvs в этом окне на стенде давал
-    # пустой вывод при работающем lvs/vgs (дефект зафиксирован DIAG).
+    # Полное зеркло ⇔ 2 PV и 0 missing (поля vgs — метаданные VG: pv_count
+    # считает ВСЕ PV, включая отсутствующие; присутствие = total − missing).
+    # pvs в окне ранней загрузки на стенде давал пустой вывод при
+    # работающих lvs/vgs — считаем через vgs (зафиксировано DIAG).
     npv_vg0=0
     for _ in $(seq 1 12); do
-        npv_vg0="$(vgs --noheadings -o pv_count vg0 2>/dev/null | tr -d ' ')"
-        case "$npv_vg0" in ''|*[!0-9]*) npv_vg0=0 ;; esac
+        total="$(vgs --noheadings -o pv_count vg0 2>/dev/null | tr -d ' ')"
+        missing="$(vgs --noheadings -o vg_missing_pv_count vg0 2>/dev/null | tr -d ' ')"
+        case "$total" in ''|*[!0-9]*) total=0 ;; esac
+        case "$missing" in ''|*[!0-9]*) missing=0 ;; esac
+        npv_vg0=$(( total - missing ))
         [ "$npv_vg0" -ge 2 ] && break
         sleep 5
     done
-    out "DIAG npv_vg0=$npv_vg0"
+    out "DIAG npv_vg0=$npv_vg0 (total=$total missing=$missing)"
     if [ "$npv_vg0" -ge 2 ]; then
         # полное зеркло: оба лега на месте, второй ESP присутствует
         check "mirror-health" sh -c "! lvs --noheadings -o lv_health_status vg0 2>/dev/null | grep -qE '[^[:space:]-]'"
