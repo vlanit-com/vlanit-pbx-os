@@ -83,8 +83,11 @@ deploy_golden() {
     [ -n "$sys_uuid" ] && [ -n "$data_uuid" ] || die "не удалось получить UUID файловых систем"
 
     log "fstab (UUID)"
+    # ESP-A без nofail: при умершем диске A systemd уходит в emergency
+    # mode до агента (стенд mirror, фаза degraded). nofail + таймаут 10 с —
+    как в чек-листе degraded-boot старого стика.
     cat > "$SYS_MNT/etc/fstab" <<EOF
-UUID=$efi_uuid /boot/efi vfat umask=0077 0 2
+UUID=$efi_uuid /boot/efi vfat umask=0077,nofail,x-systemd.device-timeout=10s 0 2
 UUID=$sys_uuid / btrfs subvol=@,compress=zstd,noatime 0 1
 UUID=$sys_uuid /var/log btrfs subvol=@var_log,noatime 0 2
 UUID=$sys_uuid /.snapshots btrfs subvol=@snapshots,noatime 0 2
