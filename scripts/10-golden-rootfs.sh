@@ -217,9 +217,15 @@ install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-atc-password-heal.sh" \
     "$ROOTFS/opt/vlanit/vlanit-atc-password-heal.sh"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/vlanit-atc-password-heal.service" \
     "$ROOTFS/etc/systemd/system/vlanit-atc-password-heal.service"
+# secret пароля веб-админа — ранняя служба ДО mikopbx (issue #34)
+install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-atc-secret.sh" \
+    "$ROOTFS/opt/vlanit/vlanit-atc-secret.sh"
+install -D -m 0644 "$PROJECT_ROOT/rootfs/vlanit-atc-secret.service" \
+    "$ROOTFS/etc/systemd/system/vlanit-atc-secret.service"
 for unit in vlanit-firstboot.service vlanit-test-agent.service \
             vlanit-ota-test.service vlanit-backup-test.service \
             vlanit-atc-password-heal.service \
+            vlanit-atc-secret.service \
             systemd-networkd.service systemd-resolved.service \
             systemd-timesyncd.service nftables.service \
             ssh.service fail2ban.service; do

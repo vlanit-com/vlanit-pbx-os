@@ -45,7 +45,13 @@ check "btrfs-snapshot-list" sh -c "/opt/vlanit/vlanit-snapshot list | grep -q te
 
 # --- Т4: MikoPBX ---
 check "quadlet-service" lib
-systemctl start mikopbx.service 2>/dev/null || true
+# АТС стартует САМА при загрузке (quadlet auto-enable + vlanit-atc-secret).
+# Ручной start здесь маскировал дефекты порядка загрузки (issue #34) —
+# только ждём, не поднимая вручную.
+for i in $(seq 1 24); do
+    systemctl is-active --quiet mikopbx.service && break
+    sleep 5
+done
 
 # ожидание готовности приложения (до 6 минут)
 ready=0
@@ -140,6 +146,10 @@ check "handle-power-key" sh -c "busctl get-property org.freedesktop.login1 /org/
 check "vlanit-doctor" sh -c "vlanit-doctor --quiet"
 # issue #10: служба самолечения пароля АТС включена и отработала
 check "atc-heal-service" sh -c "systemctl is-enabled --quiet vlanit-atc-password-heal.service"
+check "atc-secret-service" sh -c "systemctl is-enabled --quiet vlanit-atc-secret.service"
+# ordering cycle ломал автозапуск АТС на 2-й загрузке (issue #34):
+# systemd удалял job mikopbx «to break ordering cycle». В журнале быть не должно
+check "no-ordering-cycle" sh -c "! journalctl -b 2>/dev/null | grep -qi 'ordering cycle'"
 check "atc-secret-exists" lib
 check "atc-no-plaintext-in-quadlet" lib
 check "atc-dockerenv-mount" sh -c "podman inspect mikopbx --format '{{range .Mounts}}{{.Destination}} {{end}}' | grep -q '/.dockerenv'"
