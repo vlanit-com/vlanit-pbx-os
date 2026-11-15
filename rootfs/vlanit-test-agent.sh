@@ -51,7 +51,7 @@ if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
     if [ "$npv_vg0" -ge 2 ]; then
         # полное зеркло: оба лега на месте, второй ESP присутствует
         check "mirror-health" sh -c "! lvs --noheadings -o lv_health_status vg0 2>/dev/null | grep -qE '[^[:space:]-]'"
-        check "esp-b-present" sh -c "blkid -L VLANIT_EFI_B >/dev/null 2>&1"
+        check "esp-b-present" sh -c "blkid -L VLANIT-ESPB >/dev/null 2>&1"
     else
         # деградация: система работает на одном диске; если рядом чистый
         # диск — выполняем процедуру замены (как в runbook)

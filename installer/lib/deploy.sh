@@ -17,34 +17,37 @@ create_storage() {
     sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
 
     log "PV: $(partition_device "$disk_a" 2)"
-    pvcreate -y "$(partition_device "$disk_a" 2)"
+    pvcreate -y "$(partition_device "$disk_a" 2)" || die "pvcreate не выполнен"
     if [ -n "$disk_b" ]; then
         log "PV (зеркало): $(partition_device "$disk_b" 2)"
-        pvcreate -y "$(partition_device "$disk_b" 2)"
+        pvcreate -y "$(partition_device "$disk_b" 2)" || die "pvcreate (зеркало) не выполнен"
         vgcreate -y "$VG_NAME" \
-            "$(partition_device "$disk_a" 2)" "$(partition_device "$disk_b" 2)"
+            "$(partition_device "$disk_a" 2)" "$(partition_device "$disk_b" 2)" \
+            || die "vgcreate не выполнен"
         data_mib="$(lv_data_mib "$(disk_size_bytes "$disk_a")" "$(disk_size_bytes "$disk_b")")"
         [ "$data_mib" -gt 0 ] || die "зеркало: диски слишком малы для root ${sys_mib}MiB"
         log "LV: root ${sys_mib}MiB, data ${data_mib}MiB (raid1, мин. диск)"
-        lvcreate -y --type raid1 -m 1 -n root -L "${sys_mib}M" "$VG_NAME"
-        lvcreate -y --type raid1 -m 1 -n data -L "${data_mib}M" "$VG_NAME"
+        lvcreate -y --type raid1 -m 1 -n root -L "${sys_mib}M" "$VG_NAME" || die "lvcreate root (raid1) не выполнен"
+        lvcreate -y --type raid1 -m 1 -n data -L "${data_mib}M" "$VG_NAME" || die "lvcreate data (raid1) не выполнен"
     else
-        vgcreate -y "$VG_NAME" "$(partition_device "$disk_a" 2)"
+        vgcreate -y "$VG_NAME" "$(partition_device "$disk_a" 2)" || die "vgcreate не выполнен"
         log "LV: root ${sys_mib}MiB, data — остаток (linear)"
-        lvcreate -y -n root -L "${sys_mib}M" "$VG_NAME"
-        lvcreate -y -n data -l 100%FREE "$VG_NAME"
+        lvcreate -y -n root -L "${sys_mib}M" "$VG_NAME" || die "lvcreate root не выполнен"
+        lvcreate -y -n data -l 100%FREE "$VG_NAME" || die "lvcreate data не выполнен"
     fi
 
     log "mkfs.vfat $(partition_device "$disk_a" 1) (EFI)"
-    mkfs.vfat -F 32 -n VLANIT_EFI "$(partition_device "$disk_a" 1)"
-    [ -n "$disk_b" ] && {
+    mkfs.vfat -F 32 -n VLANIT_EFI "$(partition_device "$disk_a" 1)" || die "mkfs.vfat EFI не выполнен"
+    if [ -n "$disk_b" ]; then
+        # метка ≤11 символов (ограничение mkfs.vfat; «VLANIT_EFI_B» молча
+        # роняла установщик через set -e — полевой дефект найден стендом)
         log "mkfs.vfat $(partition_device "$disk_b" 1) (EFI-B)"
-        mkfs.vfat -F 32 -n VLANIT_EFI_B "$(partition_device "$disk_b" 1)"
-    }
+        mkfs.vfat -F 32 -n VLANIT-ESPB "$(partition_device "$disk_b" 1)" || die "mkfs.vfat EFI-B не выполнен"
+    fi
     log "mkfs.btrfs $LV_ROOT (System)"
-    mkfs.btrfs -f -L vlanit-system "$LV_ROOT"
+    mkfs.btrfs -f -L vlanit-system "$LV_ROOT" || die "mkfs.btrfs System не выполнен"
     log "mkfs.btrfs $LV_DATA (Data)"
-    mkfs.btrfs -f -L vlanit-data "$LV_DATA"
+    mkfs.btrfs -f -L vlanit-data "$LV_DATA" || die "mkfs.btrfs Data не выполнен"
 
     log "создание subvolumes"
     mount "$LV_ROOT" /mnt
