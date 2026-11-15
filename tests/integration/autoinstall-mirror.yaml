@@ -1,0 +1,30 @@
+# Профиль автоматической установки на ЗЕРКАЛО двух дисков (QEMU, сценарий mirror).
+# НЕ использовать на реальном железе: подтверждение заменено confirm: yes.
+# mirror_disk не задан — установщик возьмёт первый другой кандидат (/dev/vdb).
+disk: /dev/vda
+mirror: yes
+hostname: vlanit-pbx-mirror
+timezone: Europe/Moscow
+kernel_args: "VLANIT_TEST=1 VLANIT_MIRROR=1 console=ttyS0,115200 console=tty0"
+
+network:
+  mode: dhcp
+
+admin:
+  user: vlanit
+  password: "vlanit-test-pass-123"
+
+ssh:
+  enabled: true
+
+mikopbx:
+  name: VLANit-Test-Mirror
+  web_admin_login: admin
+  web_admin_password: "admin12345"
+
+wireguard:
+  enabled: true
+  address: 10.66.66.1/24
+  listen_port: 51820
+
+confirm: yes

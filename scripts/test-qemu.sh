@@ -8,6 +8,7 @@
 #   bash scripts/test-qemu.sh errors   — Т7: ошибочные сценарии
 #   bash scripts/test-qemu.sh ota      — Т8: обновление и откат (vlanit-update/rollback)
 #   bash scripts/test-qemu.sh backup   — Т9: бэкап на USB и восстановление
+#   bash scripts/test-qemu.sh mirror   — Т-mirror: зеркало RAID1 (установка, degraded, замена диска)
 #   bash scripts/test-qemu.sh all      — всё вышеперечисленное
 set -Eeuo pipefail
 
@@ -378,6 +379,83 @@ test_offline() {
     kill_qemu t5_p2
 }
 
+# Т-mirror: зеркало RAID1 двух дисков (спека mirror-two-disk, #38).
+# Фаза 1: установка на два диска. Фаза 2: полное зеркло, проверки агента.
+# Фаза 3: degraded — загрузка ТОЛЬКО со второго диска (диск A изъят).
+# Фаза 4: замена — рядом новый чистый диск, агент выполняет replace.
+test_mirror() {
+    say "Т-mirror: зеркало RAID1 — установка, degraded-загрузка, замена диска"
+    local tag="t2m"
+    local iso="$TESTDIR/${tag}.iso"
+    local diskA="$TESTDIR/${tag}_A.qcow2" diskB="$TESTDIR/${tag}_B.qcow2" diskN="$TESTDIR/${tag}_N.qcow2"
+    local log_p
+
+    make_test_iso "$iso" /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml
+    rm -f "$diskA" "$diskB" "$diskN" "$TESTDIR"/${tag}_p*_serial.log
+    make_disk "$diskA"; make_disk "$diskB"
+
+    # фаза 1: установка на зеркало (vda target, vdb mirror)
+    run_qemu "${tag}_p1" "$iso" "$diskA" \
+        -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 \
+        -drive "file=$diskB,if=virtio,format=qcow2"
+    log_p="$TESTDIR/${tag}_p1_serial.log"
+    if ! wait_serial "$log_p" "VLANIT_INSTALL_DONE" 1800; then
+        report_failures "$log_p"; shot "01-install-failed" "${tag}_p1"
+        fail "$tag: установка на зеркало не завершена (фаза 1)"
+        kill_qemu "${tag}_p1"; return 1
+    fi
+    grep -q "зеркало: /dev/vdb" "$log_p" \
+        && pass "$tag: установка на зеркало выполнена" \
+        || fail "$tag: в журнале нет подтверждения зеркала"
+    kill_qemu "${tag}_p1"
+
+    # фаза 2: полное зеркло (оба диска), проверки агента включая mirror-block
+    run_qemu "${tag}_p2" "-" "$diskA" \
+        -netdev "user,id=n0,hostfwd=tcp::8443-:443" -device virtio-net-pci,netdev=n0 \
+        -drive "file=$diskB,if=virtio,format=qcow2"
+    log_p="$TESTDIR/${tag}_p2_serial.log"
+    if wait_serial "$log_p" "VLANIT_TEST_PASS" 2400; then
+        grep -q "PASS mirror-health" "$log_p" \
+            && pass "$tag: зеркало целостно (lvs raid1, оба лега)" \
+            || fail "$tag: mirror-health не подтверждён (см. $log_p)"
+        grep -q "PASS esp-b-present" "$log_p" \
+            && pass "$tag: ESP-B присутствует" \
+            || fail "$tag: ESP-B не найден"
+    else
+        report_failures "$log_p"
+        fail "$tag: полное зеркло — проверки агента не пройдены"
+    fi
+    kill_qemu "${tag}_p2"
+
+    # фаза 3: degraded — только диск B (диск A изъят); firmware грузит ESP-B
+    run_qemu "${tag}_p3" "-" "$diskB" \
+        -netdev "user,id=n0" -device virtio-net-pci,netdev=n0
+    log_p="$TESTDIR/${tag}_p3_serial.log"
+    if wait_serial "$log_p" "VLANIT_TEST_PASS" 2400 \
+       && grep -q "PASS mirror-degraded-boot" "$log_p"; then
+        pass "$tag: загрузка со второго диска при отсутствующем диске A (degraded), АТС работает"
+    else
+        report_failures "$log_p"
+        fail "$tag: degraded-загрузка не подтверждена (см. $log_p)"
+    fi
+    kill_qemu "${tag}_p3"
+
+    # фаза 4: замена — диск B + новый чистый диск N; агент: repair, resync, ESP
+    make_disk "$diskN"
+    run_qemu "${tag}_p4" "-" "$diskB" \
+        -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 \
+        -drive "file=$diskN,if=virtio,format=qcow2"
+    log_p="$TESTDIR/${tag}_p4_serial.log"
+    if wait_serial "$log_p" "VLANIT_MIRROR: REPLACE_PASS" 2400; then
+        pass "$tag: замена диска (repair + resync), зеркло восстановлено"
+    elif grep -q "VLANIT_MIRROR: REPLACE_FAIL" "$log_p"; then
+        fail "$tag: замена диска завершилась сбоем (см. $log_p)"
+    else
+        fail "$tag: таймаут замены диска (см. $log_p)"
+    fi
+    kill_qemu "${tag}_p4"
+}
+
 cleanup_runs
 
 case "${1:-all}" in
@@ -387,7 +465,8 @@ case "${1:-all}" in
     errors)  test_errors ;;
     ota)     test_ota ;;
     backup)  test_backup ;;
-    all)     test_boot; test_install; test_offline; test_errors; test_ota; test_backup ;;
+    mirror)  test_mirror ;;
+    all)     test_boot; test_install; test_offline; test_errors; test_ota; test_backup; test_mirror ;;
     *) echo "Неизвестный сценарий: $1"; exit 2 ;;
 esac
 

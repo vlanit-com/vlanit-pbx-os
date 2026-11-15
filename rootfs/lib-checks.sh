@@ -63,12 +63,16 @@ check_btrfs-snapshot-list() { /opt/vlanit/vlanit-snapshot list >/dev/null 2>&1; 
 hint_btrfs-snapshot-list() { echo "/opt/vlanit/vlanit-snapshot list"; }
 
 # LVM-схема vg0 (root/data поверх LV; спека mirror-two-disk).
-# Системы, установленные до введения LVM, валидны — SKIP.
+# Legacy-системы (Btrfs прямо на разделах, до LVM) — валидны: SKIP.
 desc_lvm-layout() { echo "хранилище на LVM (vg0/root, vg0/data)"; }
 check_lvm-layout() {
-    findmnt -n -o SOURCE / | grep -q "^/dev/mapper/${VG_NAME:-vg0}-" || return 1
-    lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx root \
-        && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx data
+    if findmnt -n -o SOURCE / | grep -q "^/dev/mapper/${VG_NAME:-vg0}-"; then
+        lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx root \
+            && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx data
+        return
+    fi
+    findmnt -n -o FSTYPE / 2>/dev/null | grep -q btrfs && return 2
+    return 1
 }
 hint_lvm-layout() { echo "lvs; findmnt / (источник должен быть /dev/mapper/vg0-root)"; }
 

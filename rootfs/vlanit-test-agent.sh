@@ -37,11 +37,75 @@ check "podman" podman --version
 check "networkd-active" lib
 check "fstab-uuid" lib
 
-# --- T6: Btrfs ---
+# --- Т6/Т2: Btrfs + LVM-хранилище (установщик vg0, спека mirror-two-disk) ---
 check "btrfs-root" lib
+check "lvm-layout" lib
 check "btrfs-subvol-mikopbx-cf" lib
 check "btrfs-snapshot-create" /opt/vlanit/vlanit-snapshot create testagent
 check "btrfs-snapshot-list" sh -c "/opt/vlanit/vlanit-snapshot list | grep -q testagent"
+
+# --- зеркало двух дисков (маркер VLANIT_MIRROR=1 — только тест-профиль) ---
+if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
+    check "mirror-raid1-layout" sh -c "lvs --noheadings -o lv_layout vg0 2>/dev/null | grep -q raid1"
+    npv_vg0="$(pvs --noheadings -o pv_name vg0 2>/dev/null | wc -l)"
+    if [ "$npv_vg0" -ge 2 ]; then
+        # полное зеркло: оба лега на месте, второй ESP присутствует
+        check "mirror-health" sh -c "! lvs --noheadings -o lv_health_status vg0 2>/dev/null | grep -qE '[^[:space:]-]'"
+        check "esp-b-present" sh -c "blkid -L VLANIT_EFI_B >/dev/null 2>&1"
+    else
+        # деградация: система работает на одном диске; если рядом чистый
+        # диск — выполняем процедуру замены (как в runbook)
+        out "INFO mirror: vg0 деградирован ($npv_vg0 PV в системе)"
+        newdisk=""
+        while read -r dev; do
+            pvs --noheadings -o pv_name 2>/dev/null | grep -q "/dev/${dev}" && continue
+            lsblk -n -o NAME "/dev/$dev" 2>/dev/null | tail -n +2 | grep -q . && continue
+            newdisk="/dev/$dev"; break
+        done < <(lsblk -b -d -n -o NAME,TYPE,RM,RO | awk '$2=="disk" && $3=="0" && $4=="0" {print $1}')
+        if [ -z "$newdisk" ]; then
+            check "mirror-degraded-boot" sh -c "findmnt -n / | grep -q /dev/mapper/vg0-"
+        else
+            case "$newdisk" in *nvme*|*mmcblk*) pvpart="${newdisk}p2"; esppart="${newdisk}p1" ;;
+                               *) pvpart="${newdisk}2";  esppart="${newdisk}1" ;; esac
+            out "mirror-replace: новый диск $newdisk ($pvpart)"
+            if wipefs -a "$newdisk" >/dev/null 2>&1 \
+                && sgdisk --zap-all "$newdisk" >/dev/null 2>&1 \
+                && sgdisk -n1:1MiB:+1024MiB -t1:EF00 -c1:"VLANIT_EFI" "$newdisk" >/dev/null \
+                && sgdisk -n2:0:0 -t2:8E00 -c2:"VLANIT_LVM" "$newdisk" >/dev/null \
+                && partprobe "$newdisk" >/dev/null 2>&1 && sleep 2 \
+                && pvcreate -y "$pvpart" >/dev/null \
+                && vgextend vg0 "$pvpart" >/dev/null \
+                && lvconvert -y --repair vg0/root >/dev/null 2>&1 \
+                && lvconvert -y --repair vg0/data >/dev/null 2>&1; then
+                # ESP новому диску — он должен быть загрузочным сам по себе
+                mkfs.vfat -F 32 -n VLANIT_EFI "$esppart" >/dev/null 2>&1 || true
+                mkdir -p /mnt/vlanit-newesp \
+                    && mount "$esppart" /mnt/vlanit-newesp >/dev/null 2>&1 \
+                    && cp -a /boot/efi/. /mnt/vlanit-newesp/ \
+                    && umount /mnt/vlanit-newesp || true
+                # ожидание resync (до 10 минут)
+                resync_done=0
+                for i in $(seq 1 120); do
+                    pend="$(lvs --noheadings -o sync_percent vg0 2>/dev/null | awk '$1!="100.00" {n++} END {print n+0}')"
+                    [ "$pend" -eq 0 ] && { resync_done=1; break; }
+                    sleep 5
+                done
+                if [ "$resync_done" -eq 1 ] \
+                    && ! lvs --noheadings -o lv_health_status vg0 2>/dev/null | grep -qE '[^[:space:]-]'; then
+                    out "PASS mirror-replace (resync завершён, оба лега)"
+                    out "VLANIT_MIRROR: REPLACE_PASS"
+                    pass=$((pass+1))
+                else
+                    out "VLANIT_MIRROR: REPLACE_FAIL (resync_done=$resync_done)"
+                    fail=$((fail+1))
+                fi
+            else
+                out "VLANIT_MIRROR: REPLACE_FAIL (сбой процедуры замены)"
+                fail=$((fail+1))
+            fi
+        fi
+    fi
+fi
 
 # --- Т4: MikoPBX ---
 check "quadlet-service" lib
