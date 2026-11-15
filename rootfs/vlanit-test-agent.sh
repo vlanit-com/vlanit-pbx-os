@@ -46,6 +46,16 @@ check "btrfs-snapshot-list" sh -c "/opt/vlanit/vlanit-snapshot list | grep -q te
 
 # --- зеркало двух дисков (маркер VLANIT_MIRROR=1 — только тест-профиль) ---
 if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
+    # DIAG: снимок lvm-состояния на ранней загрузке — агент видел «0 PV»,
+    # интерактивно (позже) всё здорово; нужен точный ответ в окне отказа
+    {
+        echo "lvm-diag uptime=$(cut -d' ' -f1 /proc/uptime)"
+        pvs 2>&1; echo "pvs_rc=$?"
+        vgs 2>&1; echo "vgs_rc=$?"
+        lvs 2>&1; echo "lvs_rc=$?"
+        ls /dev/mapper/ 2>&1
+        head -3 /proc/mdstat 2>/dev/null
+    } | while read -r dl; do out "DIAG $dl"; done
     check "mirror-raid1-layout" sh -c "lvs --noheadings -o lv_layout vg0 2>/dev/null | grep -q raid1"
     # lvm userspace на ранней загрузке может не видеть PV — ждём до 60 с;
     # полное зеркло = 2 PV, 1 PV после таймаута = деградация (ожидаемо в фазе degraded)
