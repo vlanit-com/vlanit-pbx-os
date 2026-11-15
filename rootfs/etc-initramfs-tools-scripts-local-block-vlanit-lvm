@@ -7,7 +7,11 @@
 # фаза degraded). activation_mode по умолчанию «degraded» (trixie),
 # поэтому явного 'vgchange -ay' достаточно: полная VG — no-op,
 # деградированная — активируется.
-# Запуск ограничен счётчиком (по образцу mdadm): не чаще раза в 3 события.
+#
+# На каждом блочном событии: повторная активация активной VG — ~50 мс
+# (no-op), поэтому троттлинг не нужен. Он был бы опасен: при
+# degraded-загрузке событий всего три (диск + два раздела), и пропуск
+# нужного окна означал бы отсутствие активации вообще.
 
 PREREQ=""
 prereqs()
@@ -24,16 +28,8 @@ esac
 
 . /scripts/functions
 
-if [ -f /run/count.vlanit-lvm.initrd ]; then
-	COUNT="$(cat /run/count.vlanit-lvm.initrd)"
-else
-	COUNT=0
-fi
-COUNT=$((COUNT + 1))
-echo "$COUNT" > /run/count.vlanit-lvm.initrd
-
-if [ "$COUNT" -gt 1 ] && [ $((COUNT % 3)) -ne 0 ]; then
-	exit 0
-fi
-
+# На каждом событии: vgchange -ay на уже активной VG — ~50 мс (no-op),
+# поэтому троттлинг не нужен. Он был бы опасен: при degraded-загрузке
+# событий всего три (диск + два раздела), и пропуск нужного окна означал
+# бы отсутствие активации вообще.
 /usr/sbin/vgchange -ay vg0 >/dev/null 2>&1 || true
