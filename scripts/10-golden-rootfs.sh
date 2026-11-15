@@ -141,6 +141,11 @@ install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-update.conf" \
 # безопасность: автообновления, sshd, fail2ban
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-apt-20vlanit-auto-upgrades" \
     "$ROOTFS/etc/apt/apt.conf.d/20vlanit-auto-upgrades"
+# degraded-активация vg0 в initramfs (штатная автоактивация — только
+# когда VG полна; при умершем диске зеркала без хука корень не найден)
+install -D -m 0755 \
+    "$PROJECT_ROOT/rootfs/etc-initramfs-tools-scripts-local-block-vlanit-lvm" \
+    "$ROOTFS/etc/initramfs-tools/scripts/local-block/vlanit-lvm"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-ssh-01-vlanit.conf" \
     "$ROOTFS/etc/ssh/sshd_config.d/01-vlanit.conf"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-ssh-service-d-00-keygen.conf" \

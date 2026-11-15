@@ -37,8 +37,8 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 **Диски (LVM под Btrfs, эпик #36/#37).** Разметка каждого диска: ESP 1 ГиБ
 + PV (остаток); VG `vg0`, LV `root` 40 ГиБ и `data` (остаток); Btrfs с
 subvolumes поверх LV. Один диск — `linear`; два диска — зеркало RAID1
-(`lvcreate --type raid1`, ESP на обоих, fallback `BOOTX64.EFI` на обоих).
-Активация LVM degraded — дефолт Debian 13, хук `lvm2` в initramfs.
+(`lvcreate --type raid1`, ESP на обоих, fallback `BOOTX64.EFI` на обоих;
+хук local-block принудительно активирует vg0 деградированно в initramfs).
 Спека: `docs/specs/mirror-two-disk.md`, ADR-0004. Проверки:
 `vlanit-doctor` (`lvm-layout`, `lvm-mirror-health`).
 

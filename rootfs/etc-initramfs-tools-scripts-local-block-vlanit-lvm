@@ -1,0 +1,39 @@
+#!/bin/sh
+# VLANit PBX OS: принудительная активация VG vg0 в initramfs.
+# Штатная автоактивация (udev, 69-lvm.rules) активирует VG только когда
+# она ПОЛНА — «pvscan checks if this device completes a VG». При умершем
+# диске зеркала RAID1 vg0 не «complete» → корень не активируется →
+# initramfs shell («/dev/mapper/vg0-root does not exist», стенд mirror,
+# фаза degraded). activation_mode по умолчанию «degraded» (trixie),
+# поэтому явного 'vgchange -ay' достаточно: полная VG — no-op,
+# деградированная — активируется.
+# Запуск ограничен счётчиком (по образцу mdadm): не чаще раза в 3 события.
+
+PREREQ=""
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /scripts/functions
+
+if [ -f /run/count.vlanit-lvm.initrd ]; then
+	COUNT="$(cat /run/count.vlanit-lvm.initrd)"
+else
+	COUNT=0
+fi
+COUNT=$((COUNT + 1))
+echo "$COUNT" > /run/count.vlanit-lvm.initrd
+
+if [ "$COUNT" -gt 1 ] && [ $((COUNT % 3)) -ne 0 ]; then
+	exit 0
+fi
+
+/usr/sbin/vgchange -ay vg0 >/dev/null 2>&1 || true
