@@ -18,7 +18,7 @@ systemd-sysv dbus udev
 linux-image-amd64 initramfs-tools busybox-static
 grub-efi-amd64 grub-pc-bin grub-common
 podman crun golang-github-containers-common systemd-resolved
-btrfs-progs dosfstools e2fsprogs
+btrfs-progs dosfstools e2fsprogs lvm2
 openssh-server sudo login
 curl ca-certificates jq zstd
 python3 python3-minimal python3-yaml

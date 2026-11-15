@@ -18,7 +18,7 @@ linux-image-amd64 initramfs-tools busybox-static
 dialog locales ncurses-term
 gdisk parted
 console-setup
-btrfs-progs dosfstools e2fsprogs
+btrfs-progs dosfstools e2fsprogs lvm2
 openssh-server sudo
 curl ca-certificates jq zstd tar
 python3 python3-yaml

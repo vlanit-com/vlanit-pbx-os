@@ -1,31 +1,59 @@
-# Развёртывание системы на целевой диск: subvolumes, golden image, fstab,
-# загрузчик, импорт MikoPBX, firstboot-конфигурация.
+# Развёртывание системы на целевой диск: LVM (linear или raid1-зеркало),
+# subvolumes, golden image, fstab, загрузчик, импорт MikoPBX,
+# firstboot-конфигурация.
 # Все деструктивные операции — только после confirm_install() в основном скрипте.
 
 SYS_MNT="/mnt/vlanit-target"
+VG_NAME="vg0"
+LV_ROOT="/dev/${VG_NAME}/root"
+LV_DATA="/dev/${VG_NAME}/data"
 
-create_filesystems() {
-    local disk="$1"
-    local efi sys data
-    efi="$(partition_device "$disk" 1)"
-    sys="$(partition_device "$disk" 2)"
-    data="$(partition_device "$disk" 3)"
+# Создание хранилища: PV на каждом диске (p2), VG vg0, LV root/data.
+# Один диск — linear, два диска — raid1-зеркало (по легу на диск).
+# $1 — основной диск, $2 — (опционально) второй диск зеркала.
+create_storage() {
+    local disk_a="$1" disk_b="${2:-}"
+    local sys_mib data_mib
+    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
 
-    log "mkfs.vfat $efi (EFI)"
-    mkfs.vfat -F 32 -n VLANIT_EFI "$efi"
-    log "mkfs.btrfs $sys (System)"
-    mkfs.btrfs -f -L vlanit-system "$sys"
-    log "mkfs.btrfs $data (Data)"
-    mkfs.btrfs -f -L vlanit-data "$data"
+    log "PV: $(partition_device "$disk_a" 2)"
+    pvcreate -y "$(partition_device "$disk_a" 2)"
+    if [ -n "$disk_b" ]; then
+        log "PV (зеркало): $(partition_device "$disk_b" 2)"
+        pvcreate -y "$(partition_device "$disk_b" 2)"
+        vgcreate -y "$VG_NAME" \
+            "$(partition_device "$disk_a" 2)" "$(partition_device "$disk_b" 2)"
+        data_mib="$(lv_data_mib "$(disk_size_bytes "$disk_a")" "$(disk_size_bytes "$disk_b")")"
+        [ "$data_mib" -gt 0 ] || die "зеркало: диски слишком малы для root ${sys_mib}MiB"
+        log "LV: root ${sys_mib}MiB, data ${data_mib}MiB (raid1, мин. диск)"
+        lvcreate -y --type raid1 -m 1 -n root -L "${sys_mib}M" "$VG_NAME"
+        lvcreate -y --type raid1 -m 1 -n data -L "${data_mib}M" "$VG_NAME"
+    else
+        vgcreate -y "$VG_NAME" "$(partition_device "$disk_a" 2)"
+        log "LV: root ${sys_mib}MiB, data — остаток (linear)"
+        lvcreate -y -n root -L "${sys_mib}M" "$VG_NAME"
+        lvcreate -y -n data -l 100%FREE "$VG_NAME"
+    fi
+
+    log "mkfs.vfat $(partition_device "$disk_a" 1) (EFI)"
+    mkfs.vfat -F 32 -n VLANIT_EFI "$(partition_device "$disk_a" 1)"
+    [ -n "$disk_b" ] && {
+        log "mkfs.vfat $(partition_device "$disk_b" 1) (EFI-B)"
+        mkfs.vfat -F 32 -n VLANIT_EFI_B "$(partition_device "$disk_b" 1)"
+    }
+    log "mkfs.btrfs $LV_ROOT (System)"
+    mkfs.btrfs -f -L vlanit-system "$LV_ROOT"
+    log "mkfs.btrfs $LV_DATA (Data)"
+    mkfs.btrfs -f -L vlanit-data "$LV_DATA"
 
     log "создание subvolumes"
-    mount "$sys" /mnt
+    mount "$LV_ROOT" /mnt
     btrfs subvolume create /mnt/@
     btrfs subvolume create /mnt/@var_log
     btrfs subvolume create /mnt/@snapshots
     umount /mnt
 
-    mount "$data" /mnt
+    mount "$LV_DATA" /mnt
     btrfs subvolume create /mnt/mikopbx-cf
     btrfs subvolume create /mnt/mikopbx-storage
     btrfs subvolume create /mnt/.snapshots
@@ -33,14 +61,12 @@ create_filesystems() {
 }
 
 deploy_golden() {
-    local disk="$1"
-    local efi sys data
-    efi="$(partition_device "$disk" 1)"
-    sys="$(partition_device "$disk" 2)"
-    data="$(partition_device "$disk" 3)"
+    local disk_a="$1"
+    local efi
+    efi="$(partition_device "$disk_a" 1)"
 
     mkdir -p "$SYS_MNT"
-    mount -o subvol=@,compress=zstd,noatime "$sys" "$SYS_MNT"
+    mount -o subvol=@,compress=zstd,noatime "$LV_ROOT" "$SYS_MNT"
     mkdir -p "$SYS_MNT/boot/efi" "$SYS_MNT/var/log" "$SYS_MNT/.snapshots" \
              "$SYS_MNT/var/spool/mikopbx/cf" "$SYS_MNT/var/spool/mikopbx/storage"
 
@@ -48,10 +74,10 @@ deploy_golden() {
     tar -C "$SYS_MNT" --zstd -xpf "$PAYLOAD/golden.tar.zst"
 
     local sys_uuid data_uuid efi_uuid
-    sys_uuid="$(blkid -s UUID -o value "$sys")"
-    data_uuid="$(blkid -s UUID -o value "$data")"
+    sys_uuid="$(blkid -s UUID -o value "$LV_ROOT")"
+    data_uuid="$(blkid -s UUID -o value "$LV_DATA")"
     efi_uuid="$(blkid -s UUID -o value "$efi")"
-    [ -n "$sys_uuid" ] && [ -n "$data_uuid" ] || die "не удалось получить UUID разделов"
+    [ -n "$sys_uuid" ] && [ -n "$data_uuid" ] || die "не удалось получить UUID файловых систем"
 
     log "fstab (UUID)"
     cat > "$SYS_MNT/etc/fstab" <<EOF
@@ -161,8 +187,10 @@ PYEOF
     chmod 600 "$SYS_MNT/etc/vlanit/atc-admin-password"
 }
 
-# chroot-операции: initramfs + загрузчик
+# chroot-операции: initramfs + загрузчик.
+# $1 — (опционально) второй диск зеркала: ESP-B + UEFI-запись на него.
 install_bootloader() {
+    local disk_b="${1:-}"
     log "подготовка initramfs и GRUB (chroot)"
     mount_chroot_fs
     chroot "$SYS_MNT" /bin/sh -c "
@@ -175,6 +203,22 @@ install_bootloader() {
         cp /boot/efi/EFI/VLANIT/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.efi
         grub-mkconfig -o /boot/grub/grub.cfg
     " || die "сбой установки загрузчика"
+
+    if [ -n "$disk_b" ]; then
+        # ESP-B: байт-в-байт копия ESP-A — диск B самодостаточен
+        # (firmware грузит его при пропаже диска A). NVRAM-запись — бонус,
+        # firmware без неё найдёт fallback BOOTX64.EFI.
+        local esp_b
+        esp_b="$(partition_device "$disk_b" 1)"
+        log "ESP-B: копирование $esp_b"
+        mkdir -p /mnt/vlanit-esp-b
+        mount "$esp_b" /mnt/vlanit-esp-b || die "не удалось смонтировать $esp_b"
+        cp -a "$SYS_MNT/boot/efi/." /mnt/vlanit-esp-b/
+        chroot "$SYS_MNT" efibootmgr -c -d "$disk_b" -p 1 \
+            -L "VLANIT-B" -l '\EFI\VLANIT\grubx64.efi' 2>/dev/null \
+            || log "WARN: UEFI-запись для диска B не создана (fallback BOOTX64 всё равно есть)"
+        umount /mnt/vlanit-esp-b
+    fi
 }
 
 # chroot-окружение: bind /proc /sys /dev /run (нужны podman и grub)

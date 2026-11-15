@@ -16,8 +16,9 @@
     -> GRUB -> vmlinuz + initrd (vlanit-init)
        -> монтирование /dev/sr0 по метке, squashfs + overlayfs (tmpfs)
        -> switch_root -> systemd -> VLANit Installer (TUI, tty1)
-            -> разметка GPT: EFI 1GiB / System 40GiB / Data (остаток), Btrfs
-            -> subvolumes: @, @var_log, @snapshots | mikopbx-cf, mikopbx-storage
+            -> разметка GPT: EFI 1GiB + LVM PV (остаток), vg0: root 40GiB / data (остаток)
+            -> Btrfs поверх LV: @, @var_log, @snapshots | mikopbx-cf, mikopbx-storage
+            -> два диска: LV типа raid1 (зеркало), ESP на обоих дисках
             -> развёртывание Golden Image, fstab по UUID
             -> grub-install (x86_64-efi) в chroot, update-initramfs
             -> импорт образа MikoPBX в rootful Podman (offline, из payload)
@@ -52,14 +53,32 @@ virtio/sata/nvme, cdrom). `vlanit-init`:
 Диагностика: пункт меню GRUB «режим отладки» (`VLANIT_DEBUG=1`) открывает
 shell в initramfs.
 
-## Дисковая схема (Btrfs)
+## Дисковая схема (LVM под Btrfs)
 
-| Раздел | Размер | ФС | Назначение |
+Разметка каждого диска (GPT):
+
+| Раздел | Размер | Тип | Назначение |
 |---|---|---|---|
-| 1 | 1 GiB | FAT32 (EF00) | ESP: GRUB |
-| 2 | 40 GiB | Btrfs | `@` (root), `@var_log`, `@snapshots` |
-| 3 | остаток | Btrfs | `mikopbx-cf` (конфигурация АТС), `mikopbx-storage` (записи), `.snapshots` |
+| 1 | 1 GiB | FAT32 (EF00) | ESP: GRUB (+ fallback `BOOTX64.EFI`) |
+| 2 | остаток | LVM (8E00) | PV в VG `vg0` |
 
+LV поверх Btrfs (метки ФС сохранены — тулинг по меткам не меняется):
+
+| LV | Размер | ФС | Назначение |
+|---|---|---|---|
+| `vg0/root` | 40 GiB | Btrfs (`vlanit-system`) | `@` (root), `@var_log`, `@snapshots` |
+| `vg0/data` | остаток | Btrfs (`vlanit-data`) | `mikopbx-cf` (конфигурация АТС), `mikopbx-storage` (записи), `.snapshots` |
+
+Два диска — режим «зеркало»: оба диска размечаются одинаково, LV типа
+`raid1` (по легу на диск, размер — по меньшему диску), ESP-B — байт-в-байт
+копия ESP-A + UEFI-запись (фallback `BOOTX64.EFI` есть на обоих). Смерть
+диска не останавливает АТС: активация LVM `degraded` — дефолт trixie,
+initramfs (хук пакета `lvm2`) поднимает VG с отсутствующим PV.
+
+Один диск — та же схема, LV типа `linear` (единый кодовый путь установщика;
+зркало добавляется потом вторым PV + `lvconvert --type raid1`).
+
+Спека: `docs/specs/mirror-two-disk.md`, решение и цена: `docs/adr/0004`.
 fstab генерируется по UUID. Монтирование: `compress=zstd,noatime` для
 данных. Снапшоты — команда `vlanit-snapshot` (read-only, `/.snapshots`).
 

@@ -49,22 +49,39 @@ if [ "$HW_BOOT_MODE" != "UEFI" ]; then
     exit 1
 fi
 
-# --- Диск ---
+# --- Диски ---
 mapfile -t DISKS < <(list_candidate_disks)
 [ "${#DISKS[@]}" -gt 0 ] || die "не найдено подходящих внутренних дисков"
 
-TARGET_DISK=""
+TARGET_DISK="" MIRROR_DISK=""
 if [ -n "$AUTOMODE" ]; then
     TARGET_DISK="$(yaml_get "$AUTO_FILE" disk "")"
     echo "$TARGET_DISK" | grep -q "^/dev/" || die "autoinstall: некорректный диск: $TARGET_DISK"
     known=0
     for d in "${DISKS[@]}"; do [ "${d%%|*}" = "$TARGET_DISK" ] && known=1; done
     [ "$known" -eq 1 ] || die "autoinstall: диск $TARGET_DISK не в списке кандидатов (защита)"
+    mirror="$(yaml_get "$AUTO_FILE" mirror no | tr 'A-Z' 'a-z')"
+    if [ "$mirror" = "yes" ] || [ "$mirror" = "true" ]; then
+        MIRROR_DISK="$(yaml_get "$AUTO_FILE" mirror_disk "")"
+        if [ -z "$MIRROR_DISK" ]; then
+            for d in "${DISKS[@]}"; do
+                [ "${d%%|*}" != "$TARGET_DISK" ] && { MIRROR_DISK="${d%%|*}"; break; }
+            done
+        fi
+        [ -n "$MIRROR_DISK" ] || die "autoinstall: mirror: yes, но второй диск не найден"
+        known=0
+        for d in "${DISKS[@]}"; do [ "${d%%|*}" = "$MIRROR_DISK" ] && known=1; done
+        [ "$known" -eq 1 ] || die "autoinstall: mirror_disk $MIRROR_DISK не в списке кандидатов"
+        [ "$MIRROR_DISK" != "$TARGET_DISK" ] || die "autoinstall: mirror_disk совпадает с disk"
+        disk_is_clean_target "$MIRROR_DISK" || die "autoinstall: на $MIRROR_DISK есть смонтированные разделы"
+    fi
     disk_is_clean_target "$TARGET_DISK" || die "autoinstall: на $TARGET_DISK есть смонтированные разделы"
     min_bytes=$(( (1024 + 40960 + 8192) * 1024 * 1024 ))
-    size_bytes="$(disk_size_bytes "$TARGET_DISK")"
-    [ "$size_bytes" -ge "$min_bytes" ] || \
-        die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно ≥ 50 GiB: EFI 1 + System 40 + Data 8)"
+    for d in "$TARGET_DISK" $MIRROR_DISK; do
+        size_bytes="$(disk_size_bytes "$d")"
+        [ "$size_bytes" -ge "$min_bytes" ] || \
+            die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно ≥ 50 GiB: EFI 1 + System 40 + Data 8)"
+    done
 else
     menu_items=()
     i=1
@@ -86,8 +103,40 @@ else
         [ "$size_bytes" -lt "$warn_bytes" ] && msg="$msg\n\nПРЕДУПРЕЖДЕНИЕ: диск меньше $warn_gb GiB."
         dialog --title "Подтверждение диска" --yesno "$msg\n\nПродолжить?" 12 70 && break
     done
+    # Второй диск: зеркало RAID1. Режим спрашиваем только при ≥2 кандидатах.
+    if [ "${#DISKS[@]}" -ge 2 ]; then
+        c="$(dialog --title "Режим дисков" --menu \
+            "Обнаружено несколько накопителей. Режим установки:" 11 70 4 \
+            1 "Один диск (второй останется пустым)" \
+            2 "Зеркало RAID1 двух дисков (отказоустойчивость)" --stdout)" || exit 1
+        if [ "$c" = "2" ]; then
+            items=(); i=1
+            for d in "${DISKS[@]}"; do
+                dev="${d%%|*}"
+                [ "$dev" = "$TARGET_DISK" ] && continue
+                IFS='|' read -r _d size tran model <<< "$d"
+                items+=("$i" "$dev  $(human_gb "$size") GiB  ${model:-unknown}  [${tran:-sata}]")
+                eval "MDISK_$i='$dev'"
+                i=$((i+1))
+            done
+            c="$(dialog --title "Зеркало: второй диск" --menu \
+                "Второй диск зеркала (будет полностью очищен):" \
+                14 70 8 "${items[@]}" --stdout)" || exit 1
+            MIRROR_DISK="$(eval echo \$MDISK_$c)"
+            a_bytes="$(disk_size_bytes "$TARGET_DISK")"
+            b_bytes="$(disk_size_bytes "$MIRROR_DISK")"
+            min_disk_bytes=$(( a_bytes < b_bytes ? a_bytes : b_bytes ))
+            msg="Зеркало: $TARGET_DISK + $MIRROR_DISK"
+            if [ "$a_bytes" != "$b_bytes" ]; then
+                msg="$msg\n\nПРЕДУПРЕЖДЕНИЕ: размеры различаются ($(human_gb "$a_bytes")/$(human_gb "$b_bytes") GiB).
+Занято будет $(human_gb "$min_disk_bytes") GiB на каждом диске;
+остаток большего диска не используется."
+            fi
+            dialog --title "Подтверждение зеркала" --yesno "$msg\n\nПродолжить?" 13 70 || exit 1
+        fi
+    fi
 fi
-log "целевой диск: $TARGET_DISK"
+log "целевой диск: $TARGET_DISK${MIRROR_DISK:+, зеркало: $MIRROR_DISK}"
 
 # --- Сеть ---
 NET_IFACE="" NET_MODE="dhcp" NET_ADDR="" NET_GW="" NET_DNS="9.9.9.9"
@@ -201,7 +250,10 @@ if [ -n "$AUTOMODE" ]; then
     log "автоподтверждение (autoinstall)"
 else
     warn="$(hardware_warnings)"
-    summary="Целевой диск: $TARGET_DISK
+    mirror_line=""
+    [ -n "$MIRROR_DISK" ] && mirror_line="
+Зеркало: RAID1 ($TARGET_DISK + $MIRROR_DISK)"
+    summary="Целевой диск: $TARGET_DISK$mirror_line
 Режим сети: $NET_MODE (интерфейс $NET_IFACE)
 Hostname: $SYS_HOSTNAME
 Часовой пояс: $TZ_NAME
@@ -243,7 +295,8 @@ if [ -n "$AUTOMODE" ]; then
 fi
 
 partition_disk "$TARGET_DISK"
-create_filesystems "$TARGET_DISK"
+[ -n "$MIRROR_DISK" ] && partition_disk "$MIRROR_DISK"
+create_storage "$TARGET_DISK" $MIRROR_DISK
 deploy_golden "$TARGET_DISK"
 configure_target_system "$SYS_HOSTNAME" "$ADMIN_USER" "$ADMIN_PASS" "$SSH_ENABLED" "$TZ_NAME" "$KERNEL_ARGS"
 write_target_network "$SYS_MNT" "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
@@ -253,13 +306,13 @@ fi
 configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$PBX_ADMIN_PASS" "$TZ_NAME"
 import_mikopbx_image
 post_install_report "$TARGET_DISK"
-install_bootloader
+install_bootloader $MIRROR_DISK
 WG_PUBKEY=""
 [ "$WG_ENABLED" = "yes" ] && WG_PUBKEY="$(wireguard_pubkey)"
 unmount_target
 
-# базовый snapshot после установки
-mount -o subvolid=5 "$(partition_device "$TARGET_DISK" 2)" /mnt 2>/dev/null && {
+# базовый snapshot после установки (по метке — LV, а не раздел)
+mount -o subvolid=5 LABEL=vlanit-system /mnt 2>/dev/null && {
     btrfs subvolume snapshot -r /mnt/@ /mnt/@snapshots/post-install-@ 2>/dev/null || true
     umount /mnt
 } || true
@@ -286,6 +339,11 @@ Hostname: $SYS_HOSTNAME
 IP-адрес: $IP_ADDR
 Статус MikoPBX: будет запущена автоматически при первой загрузке
 Веб-интерфейс: https://$IP_ADDR (логин: $PBX_ADMIN_LOGIN)"
+
+if [ -n "$MIRROR_DISK" ]; then
+    finish_text="$finish_text
+Зеркало дисков: RAID1 активно ($TARGET_DISK + $MIRROR_DISK)"
+fi
 
 if [ "$PBX_PASS_GENERATED" = "1" ]; then
     finish_text="$finish_text

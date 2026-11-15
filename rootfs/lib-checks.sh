@@ -15,7 +15,7 @@
 # --- группы (для отчёта) ---
 CHECK_GROUPS=(
     "system:hostname timezone-set timesyncd apt-security-source unattended-upgrades"
-    "disks:btrfs-root btrfs-subvol-mikopbx-cf fstab-uuid btrfs-snapshot-list disk-space"
+    "disks:btrfs-root btrfs-subvol-mikopbx-cf fstab-uuid btrfs-snapshot-list disk-space lvm-layout lvm-mirror-health"
     "network:networkd-active network-address dns-resolve wireguard-active"
     "firewall:nft-active nft-policy-drop nft-no-testnet nft-localhost-root-only ports-listening"
     "ssh:ssh-host-keys ssh-service-active security-root-ssh-denied security-fail2ban bin-login-present"
@@ -61,6 +61,28 @@ hint_fstab-uuid() { echo "проверьте /etc/fstab"; }
 desc_btrfs-snapshot-list() { echo "снапшоты доступны (vlanit-snapshot list)"; }
 check_btrfs-snapshot-list() { /opt/vlanit/vlanit-snapshot list >/dev/null 2>&1; }
 hint_btrfs-snapshot-list() { echo "/opt/vlanit/vlanit-snapshot list"; }
+
+# LVM-схема vg0 (root/data поверх LV; спека mirror-two-disk).
+# Системы, установленные до введения LVM, валидны — SKIP.
+desc_lvm-layout() { echo "хранилище на LVM (vg0/root, vg0/data)"; }
+check_lvm-layout() {
+    findmnt -n -o SOURCE / | grep -q "^/dev/mapper/${VG_NAME:-vg0}-" || return 1
+    lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx root \
+        && lvs --noheadings -o lv_name "${VG_NAME:-vg0}" 2>/dev/null | grep -qx data
+}
+hint_lvm-layout() { echo "lvs; findmnt / (источник должен быть /dev/mapper/vg0-root)"; }
+
+# Здоровье зеркала: только для raid1-LV (два диска). Linear/без vg0 — SKIP.
+desc_lvm-mirror-health() { echo "LVM-зеркало целостно (оба лега raid1)"; }
+check_lvm-mirror-health() {
+    command -v lvs >/dev/null 2>&1 || return 2
+    lvs "${VG_NAME:-vg0}" >/dev/null 2>&1 || return 2
+    lvs --noheadings -o lv_layout "${VG_NAME:-vg0}" 2>/dev/null | grep -q raid1 || return 2
+    # health_status непустой и не "-" — деградация (partial и т.п.)
+    ! lvs --noheadings -o lv_health_status "${VG_NAME:-vg0}" 2>/dev/null \
+        | grep -qE '[^[:space:]-]'
+}
+hint_lvm-mirror-health() { echo "lvs -a -o +health_status; при умершем диске — runbook «Замена диска» (wiki)"; }
 
 desc_disk-space() { echo "свободное место System и Data (>10%)"; }
 check_disk-space() {

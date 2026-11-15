@@ -34,23 +34,37 @@ disk_size_bytes() {
     blockdev --getsize64 "$1" 2>/dev/null || lsblk -b -n -o SIZE "$1"
 }
 
-# Разметка GPT: EFI 1GiB, System 40GiB, Data — остаток.
+# Разметка GPT: EFI 1GiB (ESP) + остаток под LVM PV.
+# System/Data — это LV vg0 (см. deploy.sh), а не разделы.
 # Вызывается ТОЛЬКО после явного подтверждения пользователя.
 partition_disk() {
     local disk="$1"
-    local sys_mib data_mib
-    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
 
-    log "разметка $disk (GPT): EFI 1024MiB, System ${sys_mib}MiB, Data — остаток"
+    log "разметка $disk (GPT): EFI 1024MiB, LVM PV — остаток"
     wipefs -a "$disk"
     sgdisk --zap-all "$disk"
     sgdisk -n1:1MiB:+1024MiB -t1:EF00 -c1:"VLANIT_EFI" "$disk"
-    sgdisk -n2:0:+${sys_mib}MiB -t2:8300 -c2:"VLANIT_SYSTEM" "$disk"
-    sgdisk -n3:0:0       -t3:8300 -c3:"VLANIT_DATA" "$disk"
+    sgdisk -n2:0:0 -t2:8E00 -c2:"VLANIT_LVM" "$disk"
     sgdisk -p "$disk"
     partprobe "$disk" || true
     sleep 1
     udevadm settle 2>/dev/null || true
+}
+
+# Расчёт размера LV data (MiB): по меньшему диску зеркала минус ESP,
+# root-LV и запас под метаданные LVM/dm-raid. Чистая функция (тестируется).
+# lv_data_mib <disk_bytes> [disk_bytes...]
+lv_data_mib() {
+    local min_bytes="$1" b
+    for b in "$@"; do
+        [ "$b" -lt "$min_bytes" ] && min_bytes="$b"
+    done
+    local sys_mib
+    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
+    awk -v bytes="$min_bytes" -v sys="$sys_mib" 'BEGIN {
+        mib = bytes / 1024 / 1024
+        print int(mib - 1024 - sys - 128)   # 1024=ESP, 128=запас метаданных
+    }'
 }
 
 # Определение имён разделов: nvme0n1p1 vs sda1
