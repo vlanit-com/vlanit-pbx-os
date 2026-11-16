@@ -433,11 +433,15 @@ test_mirror() {
     # адреса слотов установки; без заглушки диск B в фазе 3 (один диск)
     # окажется на другом адресе → UEFI Shell вместо загрузки. Разметка
     # исключает заглушку из кандидатов replace-агента (есть разделы).
-    local dummy="$TESTDIR/${tag}_dummy.qcow2"
+    # RAW, не qcow2: sgdisk пишет посекторно и не понимает qcow2
+    # (молчаливый провал || true оставил заглушку без разметки — агент
+    # принял её за новый диск и запустил replace в фазе 3, 17.11).
+    local dummy="$TESTDIR/${tag}_dummy.raw"
     rm -f "$dummy"
-    qemu-img create -f qcow2 "$dummy" 20M >/dev/null
+    qemu-img create -f raw "$dummy" 20M >/dev/null
     DUMMY_ABS="$(realpath "$dummy")"
-    sgdisk -n1:0:0 -t1:0700 "$DUMMY_ABS" >/dev/null 2>&1 || true
+    sgdisk -n1:0:0 -t1:0700 "$DUMMY_ABS" >/dev/null
+    sgdisk -p "$DUMMY_ABS" | grep -q "partition" || die "заглушка: разметка не создана"
 
     # фаза 1: установка на зеркало (vda target, vdb mirror)
     run_qemu "${tag}_p1" "$iso" "$diskA" \
