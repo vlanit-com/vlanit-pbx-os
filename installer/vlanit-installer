@@ -308,7 +308,9 @@ partition_disk "$TARGET_DISK"
 create_storage "$TARGET_DISK" $MIRROR_DISK
 deploy_golden "$TARGET_DISK"
 configure_target_system "$SYS_HOSTNAME" "$ADMIN_USER" "$ADMIN_PASS" "$SSH_ENABLED" "$TZ_NAME" "$KERNEL_ARGS"
+log "write_target_network: старт"
 write_target_network "$SYS_MNT" "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
+log "write_target_network: готово"
 if [ "$WG_ENABLED" = "yes" ]; then
     configure_target_wireguard "$WG_ADDR" "$WG_PORT" "$WG_PEERS_FILE"
 fi

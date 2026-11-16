@@ -39,7 +39,9 @@ create_storage() {
         unsynced=1
         for i in $(seq 1 240); do
             # LC_ALL=ru_RU установщика: lvs печатает «100,00» — нормализуем
-            unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | tr ',' '.' | awk '$1!="100.00"' | wc -l)"
+            # пустой вывод lvs (ошибка) НЕ считается «синхронизировано»:
+            # требуем ≥2 строк (root+data) и все по 100.00
+            unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | tr ',' '.' | awk 'BEGIN{n=0} {n++; if ($1!="100.00") b++} END{if (n<2) print 99; else print b+0}')"
             [ "$unsynced" -eq 0 ] && break
             if [ $((i % 12)) -eq 0 ]; then
                 log "sync RAID1: $(lvs --noheadings -o name,sync_percent "$VG_NAME" 2>/dev/null | tr -s ' ' | tr '\n' ' ')"
@@ -115,7 +117,9 @@ UUID=$data_uuid /var/spool/mikopbx/storage btrfs subvol=mikopbx-storage,compress
 EOF
 
     # EFI-раздел монтируется для grub-install
-    mount "$efi" "$SYS_MNT/boot/efi"
+    log "mount ESP $efi"
+    mount "$efi" "$SYS_MNT/boot/efi" || die "не удалось смонтировать ESP"
+    log "mount ESP готов"
 }
 
 # Системная конфигурация целевой системы (без chroot там, где возможно)
@@ -147,6 +151,7 @@ EOF
     # локальный администратор (chroot)
     local encrypted
     encrypted="$(openssl passwd -6 "$admin_pass")"
+    log "chroot: создание администратора"
     chroot "$SYS_MNT" /bin/sh -c "
         useradd -m -s /bin/bash '$admin_user' 2>/dev/null || true
         usermod -aG sudo '$admin_user'
@@ -156,13 +161,16 @@ EOF
     # SSH host keys — генерируем ПРИ УСТАНОВКЕ (уникальны на устройстве,
     # в Golden Image их нет): sshd стартует с первой загрузки без падений
     # (issue #17). Drop-in 00-keygen остаётся подстраховкой.
+    log "chroot: ssh-keygen -A"
     chroot "$SYS_MNT" /usr/bin/ssh-keygen -A || die "не удалось сгенерировать SSH host keys"
 
+    log "chroot: systemctl enable/disable ssh"
     if [ "$ssh_enabled" = "yes" ]; then
         chroot "$SYS_MNT" systemctl enable ssh.service || true
     else
         chroot "$SYS_MNT" systemctl disable ssh.service || true
     fi
+    log "chroot: configure_target_system завершён"
 }
 
 configure_target_mikopbx() {
