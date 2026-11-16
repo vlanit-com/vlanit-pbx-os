@@ -38,7 +38,8 @@ create_storage() {
         log "ожидание начальной синхронизации RAID1 (до 20 мин)"
         unsynced=1
         for i in $(seq 1 240); do
-            unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | awk '$1!="100.00"' | wc -l)"
+            # LC_ALL=ru_RU установщика: lvs печатает «100,00» — нормализуем
+            unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | tr ',' '.' | awk '$1!="100.00"' | wc -l)"
             [ "$unsynced" -eq 0 ] && break
             if [ $((i % 12)) -eq 0 ]; then
                 log "sync RAID1: $(lvs --noheadings -o name,sync_percent "$VG_NAME" 2>/dev/null | tr -s ' ' | tr '\n' ' ')"

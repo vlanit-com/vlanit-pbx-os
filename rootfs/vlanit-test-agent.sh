@@ -110,7 +110,7 @@ if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
                 # ожидание resync (до 10 минут)
                 resync_done=0
                 for i in $(seq 1 120); do
-                    pend="$(lvs --noheadings -o sync_percent vg0 2>/dev/null | awk '$1!="100.00" {n++} END {print n+0}')"
+                    pend="$(lvs --noheadings -o sync_percent vg0 2>/dev/null | tr ',' '.' | awk '$1!="100.00" {n++} END {print n+0}')"
                     [ "$pend" -eq 0 ] && { resync_done=1; break; }
                     sleep 5
                 done
