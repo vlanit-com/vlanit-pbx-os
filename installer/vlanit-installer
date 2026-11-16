@@ -77,8 +77,13 @@ if [ -n "$AUTOMODE" ]; then
     fi
     disk_is_clean_target "$TARGET_DISK" || die "autoinstall: на $TARGET_DISK есть смонтированные разделы"
     # минимум — из конфигурации, без магических чисел: EFI 1 + System
-    # (system_size_mib) + Data 8, всё в GiB
-    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
+    # (system_size_mib) + Data 8, всё в GiB. Переопределение размера можно
+    # задать в autoinstall.yaml (стенд mirror использует для малого профиля).
+    # переопределение — ключ system_size_mib в autoinstall.yaml (малый
+    # профиль стенда mirror); дальше размер читает installer_system_size_mib()
+    SYS_SIZE_MIB_OVERRIDE="$(yaml_get "$AUTO_FILE" system_size_mib "")"
+    export SYS_SIZE_MIB_OVERRIDE
+    sys_mib="$(installer_system_size_mib)"
     min_gib=$(( (1024 + sys_mib + 8192) / 1024 ))
     min_bytes=$(( min_gib * 1024 * 1024 * 1024 ))
     for d in "$TARGET_DISK" $MIRROR_DISK; do

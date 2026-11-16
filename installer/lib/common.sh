@@ -46,3 +46,14 @@ PYEOF
 human_gb() {
     awk -v bytes="$1" 'BEGIN { printf "%.1f", bytes/1024/1024/1024 }'
 }
+
+# Размер root-LV (MiB): переопределение из autoinstall.yaml (стенд mirror,
+# ключ system_size_mib) → installer.system_size_mib из payload build.yaml
+# → 40960. Три потребителя: минимум диска, lv_data_mib, create_storage.
+installer_system_size_mib() {
+    if [ -n "${SYS_SIZE_MIB_OVERRIDE:-}" ]; then
+        echo "$SYS_SIZE_MIB_OVERRIDE"
+        return
+    fi
+    yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960
+}

@@ -14,7 +14,7 @@ LV_DATA="/dev/${VG_NAME}/data"
 create_storage() {
     local disk_a="$1" disk_b="${2:-}"
     local sys_mib data_mib
-    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
+    sys_mib="$(installer_system_size_mib)"
 
     log "PV: $(partition_device "$disk_a" 2)"
     pvcreate -y "$(partition_device "$disk_a" 2)" || die "pvcreate не выполнен"

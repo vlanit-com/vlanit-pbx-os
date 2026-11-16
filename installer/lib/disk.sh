@@ -60,7 +60,7 @@ lv_data_mib() {
         [ "$b" -lt "$min_bytes" ] && min_bytes="$b"
     done
     local sys_mib
-    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
+    sys_mib="$(installer_system_size_mib)"
     awk -v bytes="$min_bytes" -v sys="$sys_mib" 'BEGIN {
         mib = bytes / 1024 / 1024
         print int(mib - 1024 - sys - 128)   # 1024=ESP, 128=запас метаданных

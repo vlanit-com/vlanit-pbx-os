@@ -408,17 +408,11 @@ test_mirror() {
     local diskA="$TESTDIR/${tag}_A.qcow2" diskB="$TESTDIR/${tag}_B.qcow2" diskN="$TESTDIR/${tag}_N.qcow2"
     local log_p
 
-    # Уменьшенный профиль: root 3 ГиБ (графт build.yaml) и диски 13 ГиБ —
-    # initial sync RAID1 пишет каждый блок (~12 ГБ вместо ~63), место на
-    # хосте ~16 ГБ на прогон вместо ~70. Логика зеркала от размера не
-    # зависит; продакшн-размеры (40 ГиБ) проверяются полевым тестом.
-    local mirror_yaml="$TESTDIR/${tag}_build.yaml"
-    sed 's/^  system_size_mib: 40960$/  system_size_mib: 3072/' \
-        "$STAGING/payload/build.yaml" > "$mirror_yaml"
-
-    make_test_iso "$iso" \
-        /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml \
-        /payload/build.yaml="$mirror_yaml"
+    # Малый профиль: system_size_mib: 3072 в autoinstall-mirror.yaml
+    # (root 3 ГиБ, диски 13 ГиБ) — initial sync ~12 ГБ вместо ~63,
+    # место хоста ~16 ГБ на прогон вместо ~70. Логика зеркала от
+    # размера не зависит; продакшн-размеры — полевой тест.
+    make_test_iso "$iso" /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml
     rm -f "$diskA" "$diskB" "$diskN" "$TESTDIR"/${tag}_p*_serial.log
     DISK_SIZE_GB=13 make_disk "$diskA"; DISK_SIZE_GB=13 make_disk "$diskB"
 

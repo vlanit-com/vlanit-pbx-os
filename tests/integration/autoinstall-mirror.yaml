@@ -3,6 +3,8 @@
 # mirror_disk не задан — установщик возьмёт первый другой кандидат (/dev/vdb).
 disk: /dev/vda
 mirror: yes
+# малый профиль стенда: root 3 ГиБ (экономия места хоста, см. test_mirror)
+system_size_mib: 3072
 hostname: vlanit-pbx-mirror
 timezone: Europe/Moscow
 kernel_args: "VLANIT_TEST=1 VLANIT_MIRROR=1 console=ttyS0,115200 console=tty0"
