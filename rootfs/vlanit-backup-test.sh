@@ -28,6 +28,8 @@ case "$PHASE" in
         if vlanit-backup "$USB_MNT" >/tmp/vlanit-bak.log 2>&1; then
             ok "backup-created"
         else
+            # диагностика: причина отказа бэкапа — в его собственном журнале
+            while read -r ll; do out "  bak-log: $ll"; done < <(tail -6 /tmp/vlanit-bak.log 2>/dev/null)
             bad "backup-created"
             cat /tmp/vlanit-bak.log | while read -r l; do out "  $l"; done
         fi
