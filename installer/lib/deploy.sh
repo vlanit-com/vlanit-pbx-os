@@ -33,13 +33,19 @@ create_storage() {
         # golden, chroot) вешала установку нестабильно (стенд mirror, #8:
         # 20+ мин без прогресса, хост idle). Ставим golden только на
         # полностью синхронизированное зеркало.
-        log "ожидание начальной синхронизации RAID1 (до 10 мин)"
-        for i in $(seq 1 120); do
+        # Бюджет 20 мин: объём синка ~63 ГБ при ~100 МБ/с на стенде —
+        # 10 мин не хватило (прогон #9), это арифметика, не зависание.
+        log "ожидание начальной синхронизации RAID1 (до 20 мин)"
+        unsynced=1
+        for i in $(seq 1 240); do
             unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | awk '$1!="100.00"' | wc -l)"
             [ "$unsynced" -eq 0 ] && break
+            if [ $((i % 12)) -eq 0 ]; then
+                log "sync RAID1: $(lvs --noheadings -o name,sync_percent "$VG_NAME" 2>/dev/null | tr -s ' ' | tr '\n' ' ')"
+            fi
             sleep 5
         done
-        [ "$unsynced" -eq 0 ] || die "RAID1 не синхронизировался за 10 минут"
+        [ "$unsynced" -eq 0 ] || die "RAID1 не синхронизировался за 20 минут"
         log "RAID1 синхронизирован"
     else
         vgcreate -y "$VG_NAME" "$(partition_device "$disk_a" 2)" || die "vgcreate не выполнен"
