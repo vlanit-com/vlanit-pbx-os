@@ -266,7 +266,9 @@ build_test_package() {
     mkdir -p "$outdir"
     cp build/payload/mikopbx-2026.6.99-amd64.tar.zst \
         "$outdir/mikopbx-2026.6.99-test1-amd64.tar.zst"
-    GNUPGHOME="$HOME/.vlanit-release-gnupg" bash scripts/build-update-package.sh \
+    # TMPDIR в TESTDIR: сборочный stage build-update-package.sh — mktemp,
+    # а /tmp — переполняемый tmpfs хоста (OTA FAIL по ENOSPC 16.11).
+    TMPDIR="$TESTDIR" GNUPGHOME="$HOME/.vlanit-release-gnupg" bash scripts/build-update-package.sh \
         "$outdir/mikopbx-2026.6.99-test1-amd64.tar.zst" "$outdir" "1.2.0" >/dev/null \
         || die "не удалось собрать пакет обновления"
     ls "$outdir"/vlanit-update-*.tar
