@@ -423,12 +423,10 @@ test_mirror() {
     # размера не зависит; продакшн-размеры — полевой тест.
     make_test_iso "$iso" /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml
     rm -f "$diskA" "$diskB" "$diskN" "$TESTDIR"/${tag}_p*_serial.log
-    # Размер дисков сценария: дефолт 13 ГиБ (малый профиль, экономия места
-    # хоста). Малый диск = быстрый sync (~1 мин) → массив простаивает во
-    # время записей установки → 100% зависание в fstab/blkid (ядро,
-    # dm-raid1×btrfs; #12–#14). Размер ≥50 ГиБ (продакшн-тайминг, override
-    # MIRROR_DISK_GB) — sync ~10 мин перекрывает установку — прогоны #6/#7
-    # проходили. См. docs/specs/mirror-two-disk.md, известная проблема.
+    # Размер дисков сценария: дефолт 13 ГиБ (малый профиль, ~16 ГБ места
+    # хоста на прогон). Малый профиль валиден: «зависания» #12–#14 были
+    # дефектом deploy.sh (issue #43), не размером. Продакшн-геометрия —
+    # MIRROR_DISK_GB=50+ (нужно ~70 ГБ места хоста).
     local mdisk_gb="${MIRROR_DISK_GB:-13}"
     DISK_SIZE_GB="$mdisk_gb" make_disk "$diskA"; DISK_SIZE_GB="$mdisk_gb" make_disk "$diskB"
 

@@ -3,10 +3,11 @@
 # mirror_disk не задан — установщик возьмёт первый другой кандидат (/dev/vdb).
 disk: /dev/vda
 mirror: yes
-# Размер дисков сценария — MIRROR_DISK_GB (test-qemu.sh). Малый профиль
-# (13 ГиБ + system_size_mib: 3072) НЕ использовать: быстрый sync →
-# простаивающий массив → зависание установки (issue #43). Приёмка — на
-# дисках ≥50 ГиБ (продакшн-геометрия, sync перекрывает установку).
+# Малый профиль стенда: диски 13 ГиБ (MIRROR_DISK_GB, default) + root
+# 3 ГиБ. Запрета нет: «зависания малого профиля» (issue #43) были строкой
+# комментария без '#' в deploy.sh, а не ядром. Полный размер (≥50 ГиБ,
+# продакшн-геометрия) — через MIRROR_DISK_GB=50+ для полевой приёмки.
+system_size_mib: 3072
 hostname: vlanit-pbx-mirror
 timezone: Europe/Moscow
 kernel_args: "VLANIT_TEST=1 VLANIT_MIRROR=1 console=ttyS0,115200 console=tty0"
