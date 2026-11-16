@@ -101,8 +101,11 @@ cleanup_runs() {
 run_qemu() {
     # run_qemu <name> <iso|-> <disk|-> [extra args...]
     local name="$1" iso="$2" disk="$3"; shift 3
-    # NVRAM общий для фаз одного сценария (t2_p1/t2_p2 → t2)
-    local vbase="${name%_p1}"; vbase="${vbase%_p2}"
+    # NVRAM общий для фаз одного сценария (t2_p1/t2_p2/t2m_p4 → t2/t2m):
+    # фаза с чистым NVRAM может зависнуть на PXE («UEFI Misc Device»)
+    # вместо перехода к ESP диска (flake OVMF, найден mirror-фазой 4).
+    local vbase="$name"
+    while [[ "$vbase" =~ _p[0-9]+$ ]]; do vbase="${vbase%_p*}"; done
     local vars="$TESTDIR/${vbase}_OVMF_VARS.fd"
     cp -n "$OVMF_VARS_SRC" "$vars" 2>/dev/null || true
     local -a args=(
