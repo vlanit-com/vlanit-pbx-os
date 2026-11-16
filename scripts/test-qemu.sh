@@ -414,7 +414,14 @@ test_mirror() {
     # размера не зависит; продакшн-размеры — полевой тест.
     make_test_iso "$iso" /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml
     rm -f "$diskA" "$diskB" "$diskN" "$TESTDIR"/${tag}_p*_serial.log
-    DISK_SIZE_GB=13 make_disk "$diskA"; DISK_SIZE_GB=13 make_disk "$diskB"
+    # Размер дисков сценария: дефолт 13 ГиБ (малый профиль, экономия места
+    # хоста). Малый диск = быстрый sync (~1 мин) → массив простаивает во
+    # время записей установки → 100% зависание в fstab/blkid (ядро,
+    # dm-raid1×btrfs; #12–#14). Размер ≥50 ГиБ (продакшн-тайминг, override
+    # MIRROR_DISK_GB) — sync ~10 мин перекрывает установку — прогоны #6/#7
+    # проходили. См. docs/specs/mirror-two-disk.md, известная проблема.
+    local mdisk_gb="${MIRROR_DISK_GB:-13}"
+    DISK_SIZE_GB="$mdisk_gb" make_disk "$diskA"; DISK_SIZE_GB="$mdisk_gb" make_disk "$diskB"
 
     # фаза 1: установка на зеркало (vda target, vdb mirror)
     run_qemu "${tag}_p1" "$iso" "$diskA" \
@@ -463,7 +470,7 @@ test_mirror() {
     kill_qemu "${tag}_p3"
 
     # фаза 4: замена — диск B + новый чистый диск N; агент: repair, resync, ESP
-    DISK_SIZE_GB=13 make_disk "$diskN"
+    DISK_SIZE_GB="$mdisk_gb" make_disk "$diskN"
     run_qemu "${tag}_p4" "-" "$diskB" \
         -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 \
         -drive "file=$diskN,if=virtio,format=qcow2"
