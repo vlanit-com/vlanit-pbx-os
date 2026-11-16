@@ -95,7 +95,7 @@ cleanup_runs() {
     local keep="${KEEP_RUNS:-3}"
     ls -1dt "$PROJECT_ROOT"/build/qemu/2* 2>/dev/null | tail -n +$((keep + 1)) | \
         while read -r d; do echo "cleanup: $d"; rm -rf "$d"; done
-    rm -f /tmp/vlanit-*-usb-*.raw /tmp/vlanit-*-pkg-*
+    rm -rf /tmp/vlanit-*-usb-*.raw /tmp/vlanit-*-pkg-*
 }
 
 run_qemu() {
