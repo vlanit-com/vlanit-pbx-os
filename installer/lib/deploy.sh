@@ -29,27 +29,12 @@ create_storage() {
         log "LV: root ${sys_mib}MiB, data ${data_mib}MiB (raid1, мин. диск)"
         lvcreate -y --type raid1 -m 1 -n root -L "${sys_mib}M" "$VG_NAME" || die "lvcreate root (raid1) не выполнен"
         lvcreate -y --type raid1 -m 1 -n data -L "${data_mib}M" "$VG_NAME" || die "lvcreate data (raid1) не выполнен"
-        # Гонка initial sync dm-raid1 с последующими записами (развёртывание
-        # golden, chroot) вешала установку нестабильно (стенд mirror, #8:
-        # 20+ мин без прогресса, хост idle). Ставим golden только на
-        # полностью синхронизированное зеркало.
-        # Бюджет 20 мин: объём синка ~63 ГБ при ~100 МБ/с на стенде —
-        # 10 мин не хватило (прогон #9), это арифметика, не зависание.
-        log "ожидание начальной синхронизации RAID1 (до 20 мин)"
-        unsynced=1
-        for i in $(seq 1 240); do
-            # LC_ALL=ru_RU установщика: lvs печатает «100,00» — нормализуем
-            # пустой вывод lvs (ошибка) НЕ считается «синхронизировано»:
-            # требуем ≥2 строк (root+data) и все по 100.00
-            unsynced="$(lvs --noheadings -o sync_percent "$VG_NAME" 2>/dev/null | tr ',' '.' | awk 'BEGIN{n=0} {n++; if ($1!="100.00") b++} END{if (n<2) print 99; else print b+0}')"
-            [ "$unsynced" -eq 0 ] && break
-            if [ $((i % 12)) -eq 0 ]; then
-                log "sync RAID1: $(lvs --noheadings -o name,sync_percent "$VG_NAME" 2>/dev/null | tr -s ' ' | tr '\n' ' ')"
-            fi
-            sleep 5
-        done
-        [ "$unsynced" -eq 0 ] || die "RAID1 не синхронизировался за 20 минут"
-        log "RAID1 синхронизирован"
+        # Initial sync идёт в фоне и догоняет после перезагрузки (bitmap).
+        # НЕ ждать завершения: простаивающий массив во время записей
+        # установки зависает на fstab/blkid (dm-raid1 idle × btrfs commit,
+        # прогоны #12–#14; issue #43). Активный sync перекрывает
+        # установку — прогоны #6/#7 стабильно проходили.
+        log "RAID1: initial sync в фоне (resync возобновится после reboot)"
     else
         vgcreate -y "$VG_NAME" "$(partition_device "$disk_a" 2)" || die "vgcreate не выполнен"
         log "LV: root ${sys_mib}MiB, data — остаток (linear)"
