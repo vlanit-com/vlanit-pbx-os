@@ -76,11 +76,15 @@ if [ -n "$AUTOMODE" ]; then
         disk_is_clean_target "$MIRROR_DISK" || die "autoinstall: на $MIRROR_DISK есть смонтированные разделы"
     fi
     disk_is_clean_target "$TARGET_DISK" || die "autoinstall: на $TARGET_DISK есть смонтированные разделы"
-    min_bytes=$(( (1024 + 40960 + 8192) * 1024 * 1024 ))
+    # минимум — из конфигурации, без магических чисел: EFI 1 + System
+    # (system_size_mib) + Data 8, всё в GiB
+    sys_mib="$(yaml_get "$PAYLOAD/build.yaml" installer.system_size_mib 40960)"
+    min_gib=$(( (1024 + sys_mib + 8192) / 1024 ))
+    min_bytes=$(( min_gib * 1024 * 1024 * 1024 ))
     for d in "$TARGET_DISK" $MIRROR_DISK; do
         size_bytes="$(disk_size_bytes "$d")"
         [ "$size_bytes" -ge "$min_bytes" ] || \
-            die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно ≥ 50 GiB: EFI 1 + System 40 + Data 8)"
+            die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно ≥ $min_gib GiB: EFI 1 + System $((sys_mib/1024)) + Data 8)"
     done
 else
     menu_items=()
