@@ -408,9 +408,19 @@ test_mirror() {
     local diskA="$TESTDIR/${tag}_A.qcow2" diskB="$TESTDIR/${tag}_B.qcow2" diskN="$TESTDIR/${tag}_N.qcow2"
     local log_p
 
-    make_test_iso "$iso" /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml
+    # Уменьшенный профиль: root 3 ГиБ (графт build.yaml) и диски 13 ГиБ —
+    # initial sync RAID1 пишет каждый блок (~12 ГБ вместо ~63), место на
+    # хосте ~16 ГБ на прогон вместо ~70. Логика зеркала от размера не
+    # зависит; продакшн-размеры (40 ГиБ) проверяются полевым тестом.
+    local mirror_yaml="$TESTDIR/${tag}_build.yaml"
+    sed 's/^  system_size_mib: 40960$/  system_size_mib: 3072/' \
+        "$STAGING/payload/build.yaml" > "$mirror_yaml"
+
+    make_test_iso "$iso" \
+        /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml \
+        /payload/build.yaml="$mirror_yaml"
     rm -f "$diskA" "$diskB" "$diskN" "$TESTDIR"/${tag}_p*_serial.log
-    make_disk "$diskA"; make_disk "$diskB"
+    DISK_SIZE_GB=13 make_disk "$diskA"; DISK_SIZE_GB=13 make_disk "$diskB"
 
     # фаза 1: установка на зеркало (vda target, vdb mirror)
     run_qemu "${tag}_p1" "$iso" "$diskA" \
@@ -459,7 +469,7 @@ test_mirror() {
     kill_qemu "${tag}_p3"
 
     # фаза 4: замена — диск B + новый чистый диск N; агент: repair, resync, ESP
-    make_disk "$diskN"
+    DISK_SIZE_GB=13 make_disk "$diskN"
     run_qemu "${tag}_p4" "-" "$diskB" \
         -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 \
         -drive "file=$diskN,if=virtio,format=qcow2"
