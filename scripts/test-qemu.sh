@@ -429,6 +429,15 @@ test_mirror() {
     # MIRROR_DISK_GB=50+ (нужно ~70 ГБ места хоста).
     local mdisk_gb="${MIRROR_DISK_GB:-13}"
     DISK_SIZE_GB="$mdisk_gb" make_disk "$diskA"; DISK_SIZE_GB="$mdisk_gb" make_disk "$diskB"
+    # Заглушка в слот диска A для фаз 3/4: общий NVRAM ссылается на PCI-
+    # адреса слотов установки; без заглушки диск B в фазе 3 (один диск)
+    # окажется на другом адресе → UEFI Shell вместо загрузки. Разметка
+    # исключает заглушку из кандидатов replace-агента (есть разделы).
+    local dummy="$TESTDIR/${tag}_dummy.qcow2"
+    rm -f "$dummy"
+    qemu-img create -f qcow2 "$dummy" 20M >/dev/null
+    DUMMY_ABS="$(realpath "$dummy")"
+    sgdisk -n1:0:0 -t1:0700 "$DUMMY_ABS" >/dev/null 2>&1 || true
 
     # фаза 1: установка на зеркало (vda target, vdb mirror)
     run_qemu "${tag}_p1" "$iso" "$diskA" \
@@ -463,9 +472,11 @@ test_mirror() {
     fi
     kill_qemu "${tag}_p2"
 
-    # фаза 3: degraded — только диск B (диск A изъят); firmware грузит ESP-B
-    run_qemu "${tag}_p3" "-" "$diskB" \
-        -netdev "user,id=n0" -device virtio-net-pci,netdev=n0
+    # фаза 3: degraded — только диск B (диск A изъят); firmware грузит ESP-B.
+    # Диск B — во второй слот (как при установке): заглушка занимает слот A.
+    run_qemu "${tag}_p3" "-" "$dummy" \
+        -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 \
+        -drive "file=$diskB,if=virtio,format=qcow2"
     log_p="$TESTDIR/${tag}_p3_serial.log"
     if wait_serial "$log_p" "VLANIT_TEST_PASS" 2400 \
        && grep -q "PASS mirror-degraded-boot" "$log_p"; then
@@ -478,8 +489,9 @@ test_mirror() {
 
     # фаза 4: замена — диск B + новый чистый диск N; агент: repair, resync, ESP
     DISK_SIZE_GB="$mdisk_gb" make_disk "$diskN"
-    run_qemu "${tag}_p4" "-" "$diskB" \
+    run_qemu "${tag}_p4" "-" "$dummy" \
         -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 \
+        -drive "file=$diskB,if=virtio,format=qcow2" \
         -drive "file=$diskN,if=virtio,format=qcow2"
     log_p="$TESTDIR/${tag}_p4_serial.log"
     if wait_serial "$log_p" "VLANIT_MIRROR: REPLACE_PASS" 2400; then
