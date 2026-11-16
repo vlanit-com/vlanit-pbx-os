@@ -280,7 +280,11 @@ run_usb_scenario() {
     local tag="$1" marker="$2" yaml="$3" mode="${4:-blank}"
     local p1="${tag}_p1" p2="${tag}_p2"
     local disk="$TESTDIR/${tag}_disk.qcow2"
-    local usb="/tmp/vlanit-${tag}-usb-$$.raw"
+    # USB-образы в TESTDIR, не в /tmp: tmpfs хоста может быть переполнен
+    # (файлы root-owned чужие/старые), а сценарий держит оба файла только
+    # в пределах одного прогона (дефект найден регрессом 16.11: OTA FAIL
+    # по ENOSPC в /tmp при 100%-м tmpfs).
+    local usb="$TESTDIR/${tag}_usb.raw"
     local iso="$TESTDIR/${tag}.iso"
     make_test_iso "$iso" /autoinstall.yaml="$yaml"
     rm -f "$disk" "$TESTDIR/${p1}_serial.log" "$TESTDIR/${p2}_serial.log"
@@ -295,7 +299,7 @@ run_usb_scenario() {
     kill_qemu "$p1"
     if [ "$mode" = "update" ]; then
         # пакет собираем в /tmp ПОСЛЕ фазы 1
-        local pkgdir="/tmp/vlanit-${tag}-pkg-$$"
+        local pkgdir="$TESTDIR/${tag}_pkg"
         build_test_package "$pkgdir" >/dev/null
         make_usb_update "$usb" "$pkgdir"
         rm -rf "$pkgdir"
