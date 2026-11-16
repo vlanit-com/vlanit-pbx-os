@@ -231,7 +231,17 @@ check "ssh-clean-start" sh -c "systemctl show ssh.service -p NRestarts --value |
 check "pids-limit" lib
 check "handle-power-key" sh -c "busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager HandlePowerKey 2>/dev/null | grep -q ignore"
 # issue #9: диагностический инструмент на устройстве (общая библиотека)
-check "vlanit-doctor" sh -c "vlanit-doctor --quiet"
+# На деградированной системе (фаза degraded: диск изъят намеренно)
+# doctor законно красный (lvm-mirror-health видит потерянный лег) —
+# WARN-CHECK по прецеденту reboot-api-login. doctor как инструмент
+# на поле не меняется: при живом диске FAIL остаётся FAIL.
+if sh -c "vlanit-doctor --quiet" >>"$AGENT_LOG" 2>&1; then
+    out "PASS vlanit-doctor"; pass=$((pass+1))
+elif [ "${npv_vg0:-2}" -lt 2 ]; then
+    out "WARN-CHECK FAIL vlanit-doctor (деградация зеркала ожидаема, фаза degraded)"
+else
+    out "FAIL vlanit-doctor (детали: $AGENT_LOG)"; fail=$((fail+1))
+fi
 # issue #10: служба самолечения пароля АТС включена и отработала
 check "atc-heal-service" sh -c "systemctl is-enabled --quiet vlanit-atc-password-heal.service"
 check "atc-secret-service" sh -c "systemctl is-enabled --quiet vlanit-atc-secret.service"
