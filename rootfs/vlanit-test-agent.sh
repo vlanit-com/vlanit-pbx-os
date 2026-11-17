@@ -96,17 +96,22 @@ if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
                 && sgdisk --zap-all "$newdisk" >/dev/null 2>&1 \
                 && sgdisk -n1:1MiB:+1024MiB -t1:EF00 -c1:"VLANIT_EFI" "$newdisk" >/dev/null \
                 && sgdisk -n2:0:0 -t2:8E00 -c2:"VLANIT_LVM" "$newdisk" >/dev/null \
-                && partprobe "$newdisk" >/dev/null 2>&1 && sleep 2 \
+                && partprobe "$newdisk" >/dev/null 2>&1 \
+                && { for _w in $(seq 1 15); do [ -b "$pvpart" ] && break; sleep 1; done; [ -b "$pvpart" ]; } \
                 && pvcreate -y "$pvpart" >/dev/null \
                 && vgextend vg0 "$pvpart" >/dev/null \
                 && lvconvert -y --repair vg0/root >/dev/null 2>&1 \
                 && lvconvert -y --repair vg0/data >/dev/null 2>&1; then
-                # ESP новому диску — он должен быть загрузочным сам по себе
+                # ESP новому диску — он должен быть загрузочным сам по себе.
+                # Источник — ESP-B (диск B; /boot/efi на деградированной
+                # системе не смонтирован: ESP-A отсутствует, nofail).
+                ESPSRC="$(blkid -L VLANIT-ESPB 2>/dev/null)"
                 mkfs.vfat -F 32 -n VLANIT_EFI "$esppart" >/dev/null 2>&1 || true
-                mkdir -p /mnt/vlanit-newesp \
+                mkdir -p /mnt/vlanit-newesp /mnt/vlanit-espsrc \
+                    && [ -n "$ESPSRC" ] && mount "$ESPSRC" /mnt/vlanit-espsrc >/dev/null 2>&1 \
                     && mount "$esppart" /mnt/vlanit-newesp >/dev/null 2>&1 \
-                    && cp -a /boot/efi/. /mnt/vlanit-newesp/ \
-                    && umount /mnt/vlanit-newesp || true
+                    && cp -a /mnt/vlanit-espsrc/. /mnt/vlanit-newesp/ \
+                    && umount /mnt/vlanit-newesp /mnt/vlanit-espsrc || true
                 # ожидание resync (до 10 минут)
                 resync_done=0
                 for i in $(seq 1 120); do
