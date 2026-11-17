@@ -301,13 +301,6 @@ else
     progress_begin "Установка VLANit PBX OS"
 fi
 
-# распакованные размеры payload проставляет 40-staging.sh (null у ISO
-# до 1.3.2 — тогда суб-прогресс по du отключён, этап идёт скачком)
-golden_bytes="$(yaml_get "$PAYLOAD/release-manifest.yaml" payload.golden_uncompressed 0)"
-mikopbx_bytes="$(yaml_get "$PAYLOAD/release-manifest.yaml" payload.mikopbx_uncompressed 0)"
-case "$golden_bytes" in ''|*[!0-9]*) golden_bytes=0 ;; esac
-case "$mikopbx_bytes" in ''|*[!0-9]*) mikopbx_bytes=0 ;; esac
-
 # --- этапы (обёртки с фиксированной сигнатурой для run_stage) ---
 verify_payload() {
     ( cd "$PAYLOAD" && sha256sum -c golden.tar.zst.sha256 ) || \
@@ -327,19 +320,7 @@ stage_mikopbx_env() { configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$
 run_stage 3 "Проверка контрольных сумм" verify_payload
 run_stage 8 "Разметка дисков" stage_partitions
 run_stage 13 "Хранилище (LVM, Btrfs)" create_storage "$TARGET_DISK" $MIRROR_DISK
-
-# Суб-прогресс по du ТОЛЬКО в интерактиве и ТОЛЬКО на одном диске.
-# При зеркале RAID1 initial sync идёт в фоне, и активные чтения/записи
-# btrfs в этот момент зависают (dm-raid1 idle × btrfs commit, issue #43):
-# du по подтому во время распаковки — именно такой триггер (найдено
-# стендом 1.3.2: gauge зависал на этапе развёртывания). На зеркале
-# этапы идут скачком от/до — честно к прогону без читателей.
-if [ -z "$AUTOMODE" ] && [ -z "$MIRROR_DISK" ]; then
-    stage_with_size_progress 13 60 "Развёртывание системы" \
-        "$SYS_MNT" "$golden_bytes" stage_deploy
-else
-    run_stage 60 "Развёртывание системы" stage_deploy
-fi
+run_stage 60 "Развёртывание системы" stage_deploy
 
 run_stage 65 "Конфигурация системы" \
     configure_target_system "$SYS_HOSTNAME" "$ADMIN_USER" "$ADMIN_PASS" "$SSH_ENABLED" "$TZ_NAME" "$KERNEL_ARGS"
@@ -349,13 +330,7 @@ if [ "$WG_ENABLED" = "yes" ]; then
     run_stage 70 "Настройка WireGuard" configure_target_wireguard "$WG_ADDR" "$WG_PORT" "$WG_PEERS_FILE"
 fi
 run_stage 72 "Настройка MikoPBX" stage_mikopbx_env
-
-if [ -z "$AUTOMODE" ] && [ -z "$MIRROR_DISK" ]; then
-    stage_with_size_progress 72 85 "Импорт образа MikoPBX" \
-        "$SYS_MNT/var/lib/containers" "$mikopbx_bytes" import_mikopbx_image
-else
-    run_stage 85 "Импорт образа MikoPBX" import_mikopbx_image
-fi
+run_stage 85 "Импорт образа MikoPBX" import_mikopbx_image
 
 run_stage 95 "Загрузчик (initramfs, GRUB)" install_bootloader $MIRROR_DISK
 

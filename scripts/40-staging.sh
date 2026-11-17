@@ -32,10 +32,6 @@ DEBIAN_VERSION="$(jq -r .debian_version "$FACTS")"
 KERNEL_VERSION="$(jq -r .kernel_version "$FACTS")"
 PODMAN_VERSION="$(jq -r .podman_version "$FACTS")"
 
-log "распакованные размеры payload (знаменатель суб-прогресса установщика)"
-GOLDEN_UNCOMPRESSED="$(zstd -dc "$STAGING/payload/golden.tar.zst" | wc -c)"
-MIKOPBX_UNCOMPRESSED="$(zstd -dc "$STAGING/payload/mikopbx-2026.6.99-amd64.tar.zst" | wc -c)"
-
 log "release-manifest.yaml"
 python3 - "$STAGING/payload/release-manifest.yaml" <<EOF
 import sys, datetime
@@ -48,8 +44,6 @@ repl = {
     "podman: null": f"podman: \"$PODMAN_VERSION\"",
     "  golden_tar: null": f"  golden_tar: \"$GOLDEN_SHA\"",
     "  mikopbx_tar: null": f"  mikopbx_tar: \"$MIKOPBX_SHA\"",
-    "  golden_uncompressed: null": f"  golden_uncompressed: $GOLDEN_UNCOMPRESSED",
-    "  mikopbx_uncompressed: null": f"  mikopbx_uncompressed: $MIKOPBX_UNCOMPRESSED",
 }
 for k, v in repl.items():
     assert k in text, f"ключ не найден в манифесте: {k}"

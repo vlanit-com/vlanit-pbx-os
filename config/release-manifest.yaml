@@ -20,5 +20,3 @@ payload:
   golden_tar: null        # sha256 golden.tar.zst
   mikopbx_tar: null       # sha256 mikopbx.tar.zst
   iso_sha256: null
-  golden_uncompressed: null   # байт, zstd -dc | wc -c (суб-прогресс установки)
-  mikopbx_uncompressed: null  # байт, zstd -dc | wc -c (суб-прогресс установки)

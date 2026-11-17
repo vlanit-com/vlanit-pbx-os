@@ -94,6 +94,11 @@ progress_end() {
 # Один этап установки: тик прогресса, команда с выводом в журнал.
 # В интерактиве stdout/stderr этапа уходят в LOG_FILE (иначе мусор
 # попадёт на экран gauge); в autoinstall вывод остаётся на консоли.
+#
+# Суб-прогресс по du для долгих этапов УДАЛЁН (1.3.2): фоновый du по
+# целевой ФС во время распаковки дважды уходил в D-state навсегда
+# (зеркало и однодисковый режим, serial молчал часами). Этапы идут
+# скачком; плавность времени даёт калиброванная ETA-таблица выше.
 run_stage() {
     local pct="$1" text="$2"
     shift 2
@@ -105,34 +110,4 @@ run_stage() {
         # зависло бы навсегда (интерактив-регрессия 1.3.2)
         { "$@" >> "$LOG_FILE" 2>&1; } </dev/null || { progress_abort; die "сбой этапа: $text"; }
     fi
-}
-
-# stage_with_size_progress <pct_from> <pct_to> <статус> <целевой каталог>
-#   <полный размер, байты> <команда...>
-# Долгий этап с честным суб-прогрессом: команда в фоне, каждые 2 с
-# измеряем du целевого каталога и двигаем процент пропорционально
-# заполнению (знаменатель — распакованный размер из release-manifest,
-# проставляется сборкой). Ошибка команды — abort + die.
-stage_with_size_progress() {
-    local from="$1" to="$2" text="$3" target="$4" total="$5"
-    shift 5
-    log "этап (size-progress $from→$to %): $text"
-    "$@" >> "$LOG_FILE" 2>&1 </dev/null &
-    local pid=$! cur pct
-    while kill -0 "$pid" 2>/dev/null; do
-        cur="$(du -sb "$target" 2>/dev/null | awk '{print $1}')"
-        if [ -n "$total" ] && [ "$total" -gt 0 ] && [ -n "$cur" ]; then
-            pct=$(( from + cur * (to - from) / total ))
-            [ "$pct" -gt "$to" ] && pct="$to"
-        else
-            pct="$from"
-        fi
-        progress_stage "$pct" "$text"
-        sleep 2
-    done
-    if ! wait "$pid"; then
-        progress_abort
-        die "сбой этапа: $text"
-    fi
-    progress_stage "$to" "$text"
 }
