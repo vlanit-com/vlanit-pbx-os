@@ -8,11 +8,14 @@ BUILD_DIR="$PROJECT_ROOT/build"
 STAGING="$BUILD_DIR/iso-staging"
 GRUB_DIR="$BUILD_DIR/grub"
 DIST_DIR="$PROJECT_ROOT/dist"
-# имя ISO — из config/build.yaml (output.iso_name), единый источник.
-# Хардкод имени в этом скрипте уже однажды дал релиз с чужим именем
-# файла (1.3.0 собрал артефакты 1.2.9) — имя только из конфигурации.
+# имя ISO и версия — из config/build.yaml, единый источник.
+# Хардкод версии в этом скрипте уже однажды дал релиз с чужими
+# строками (1.3.0 собрал артефакты 1.2.9, 1.3.1 — меню GRUB «1.2.9»)
+# — имя и версия только из конфигурации.
 ISO_NAME="$(sed -n 's/^  iso_name: //p' "$PROJECT_ROOT/config/build.yaml" | head -1)"
+VERSION="$(sed -n 's/^  version: //p' "$PROJECT_ROOT/config/build.yaml" | head -1 | tr -d '"')"
 [ -n "$ISO_NAME" ] || { echo "[iso] ОШИБКА: iso_name не найден в config/build.yaml" >&2; exit 1; }
+[ -n "$VERSION" ] || { echo "[iso] ОШИБКА: version не найден в config/build.yaml" >&2; exit 1; }
 mkdir -p "$STAGING/boot/grub" "$GRUB_DIR" "$DIST_DIR"
 
 log() { printf '[iso] %s\n' "$*"; }
@@ -31,7 +34,7 @@ grub-mkfont -o "$BRAND_OUT/unicode.pf2" -s 32 -r 0x20-0x2FFF \
 
 # --- grub.cfg на ISO (фирменная тема VLANit: палитра с vlanit.com) ---
 cp "$BRAND_OUT/vlanit-grub-bg.png" "$STAGING/boot/grub/vlanit-grub-bg.png"
-cat > "$STAGING/boot/grub/grub.cfg" <<'EOF'
+cat > "$STAGING/boot/grub/grub.cfg" <<EOF
 set timeout=5
 set default=0
 
@@ -49,12 +52,12 @@ set menu_color_highlight=black/yellow
 
 search --no-floppy --set=root --label VLANIT_PBX_OS
 
-menuentry "Установить VLANit PBX OS 1.2.9 (UEFI)" --class debian --class gnu-linux {
+menuentry "Установить VLANit PBX OS $VERSION (UEFI)" --class debian --class gnu-linux {
     linux /live/vmlinuz ro quiet loglevel=3 console=tty0 console=ttyS0,115200
     initrd /live/initrd
 }
 
-menuentry "Установить VLANit PBX OS 1.2.9 (режим отладки)" {
+menuentry "Установить VLANit PBX OS $VERSION (режим отладки)" {
     linux /live/vmlinuz ro loglevel=7 VLANIT_DEBUG=1 console=tty0 console=ttyS0,115200
     initrd /live/initrd
 }
@@ -101,7 +104,7 @@ ISO_PATH="$DIST_DIR/$ISO_NAME"
 rm -f "$ISO_PATH"
 xorriso -as mkisofs \
     -V VLANIT_PBX_OS \
-    -A "VLANit PBX OS 1.2.9" \
+    -A "VLANit PBX OS $VERSION" \
     -quiet \
     -o "$ISO_PATH" \
     -e boot/grub/efi.img -no-emul-boot \
