@@ -26,6 +26,7 @@ kbd tzdata
 iproute2 iputils-ping ethtool pciutils usbutils nvme-cli dmidecode smartmontools
 iptables nftables
 grub-common
+plymouth plymouth-themes
 "
 
 log "mmdebstrap: live rootfs"
@@ -104,6 +105,10 @@ EOF
 chroot "$ROOTFS" systemctl mask ssh.service 2>/dev/null || true
 # preset-файл попадает в rootfs уже после установки пакетов — включаем явно
 chroot "$ROOTFS" systemctl enable vlanit-installer.service 2>/dev/null || true
+
+# Plymouth: фирменная тема VLANit — splash на загрузке live-установщика
+# (тот же скрипт, что и в golden; installer.service ждёт plymouth-quit-wait)
+"$PROJECT_ROOT/scripts/install-plymouth-theme.sh" "$ROOTFS"
 
 # очистка
 rm -f "$ROOTFS/etc/resolv.conf" "$ROOTFS/etc/machine-id" "$ROOTFS/var/lib/dbus/machine-id"

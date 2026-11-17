@@ -159,25 +159,12 @@ install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-ssh-service-d-00-keygen.conf" \
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-fail2ban-vlanit-sshd.conf" \
     "$ROOTFS/etc/fail2ban/jail.d/vlanit-sshd.conf"
 
-# Plymouth: фирменная тема VLANit (на базе spinner: анимация и диалоги
-# копируются из установленного пакета, фон/цвета — бренд, watermark — логотип)
-PLY_THEME="$ROOTFS/usr/share/plymouth/themes/vlanit"
-mkdir -p "$PLY_THEME"
-cp "$ROOTFS"/usr/share/plymouth/themes/spinner/*.png "$PLY_THEME/"
-install -D -m 0644 "$PROJECT_ROOT/branding/vlanit.plymouth" \
-    "$PLY_THEME/vlanit.plymouth"
-python3 - "$PROJECT_ROOT/branding/vlanit-logo-on-dark.svg" \
-    "$PLY_THEME/watermark.png" <<'PYEOF'
-import sys
-import cairosvg
-cairosvg.svg2png(url=sys.argv[1], write_to=sys.argv[2],
-                 output_width=360, background_color="rgba(0,0,0,0)")
-PYEOF
-cat > "$ROOTFS/etc/plymouth/plymouthd.conf" <<'EOF'
-[Daemon]
-Theme=vlanit
-ShowDelay=0
-EOF
+# Plymouth: фирменная тема VLANit (общий скрипт — та же логика в live rootfs)
+"$PROJECT_ROOT/scripts/install-plymouth-theme.sh" "$ROOTFS"
+# GPU KMS-модули в initramfs: без них ранний plymouth в initramfs сидит на
+# текстовом фолбэке и графический splash не показывается (spec 1.3.2)
+install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-initramfs-tools-modules" \
+    "$ROOTFS/etc/initramfs-tools/modules"
 
 # кириллица на консоли (trixie: шрифты только в console-setup)
 cat > "$ROOTFS/etc/vconsole.conf" <<'EOF'

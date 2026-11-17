@@ -208,6 +208,9 @@ check "security-fail2ban" lib
 
 # --- брендинг: фирменная тема Plymouth ---
 check "plymouth-theme-vlanit" grep -q "Theme=vlanit" /etc/plymouth/plymouthd.conf
+# ранний KMS в initramfs — условие графического splash (spec 1.3.2-plymouth-verify)
+check "plymouth-initramfs-gpu-modules" grep -q "^bochs\|^i915\|^ast" /etc/initramfs-tools/modules
+check "plymouth-cmdline-splash" grep -q "splash" /proc/cmdline
 
 # --- 1.2.3: реестр проверок по фидбеку полевых тестов ---
 check "apt-security-source" lib

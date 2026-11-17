@@ -53,7 +53,7 @@ set menu_color_highlight=black/yellow
 search --no-floppy --set=root --label VLANIT_PBX_OS
 
 menuentry "Установить VLANit PBX OS $VERSION (UEFI)" --class debian --class gnu-linux {
-    linux /live/vmlinuz ro quiet loglevel=3 console=tty0 console=ttyS0,115200
+    linux /live/vmlinuz ro quiet loglevel=3 splash console=tty0 console=ttyS0,115200
     initrd /live/initrd
 }
 

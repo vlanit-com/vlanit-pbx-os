@@ -1,0 +1,10 @@
+# Фирменная тема Plymouth (two-step) рисуется на KMS-консоли.
+# В initramfs по умолчанию GPU-модули не включаются (MODULES=most их не
+# добавляет), поэтому ранний splash деградирует в текст — загружаем явно.
+# Потребитель: plymouth в initramfs установленной системы (spec 1.3.2-plymouth-verify).
+ast
+i915
+amdgpu
+radeon
+bochs
+virtio-gpu
