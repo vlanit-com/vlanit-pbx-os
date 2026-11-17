@@ -29,6 +29,11 @@ for a in "$@"; do
 done
 
 F=0 JQ_OUT=""
+# шапка plain-отчёта: версия ОС (аудит версий 1.3.2 — в полевых
+# логах doctor версию раньше не определить)
+if [ "$QUIET" != "1" ] && [ "$JSON" != "1" ]; then
+    . /etc/os-release 2>/dev/null && printf 'OS: %s\n' "${PRETTY_NAME:-unknown}"
+fi
 report() {
     # report <group> <name> <rc>
     local group="$1" name="$2" rc="$3" st

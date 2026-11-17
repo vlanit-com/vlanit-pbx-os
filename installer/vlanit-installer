@@ -49,7 +49,7 @@ fi
 if [ "$HW_BOOT_MODE" != "UEFI" ]; then
     if [ -n "$AUTOMODE" ]; then die "требуется UEFI"; fi
     dialog --title "Режим загрузки" --msgbox \
-        "Загрузка выполнена не в UEFI-режиме.\nVLANit PBX OS 1.0 устанавливается только на UEFI.\n\nРежим: $HW_BOOT_MODE" 10 60
+        "Загрузка выполнена не в UEFI-режиме.\nVLANit PBX OS $manifest_version устанавливается только на UEFI.\n\nРежим: $HW_BOOT_MODE" 10 60
     exit 1
 fi
 
