@@ -117,7 +117,11 @@ run_qemu() {
         -monitor "unix:$TESTDIR/${name}.monitor,server,nowait"
         -display none -pidfile "$TESTDIR/${name}.pid" -daemonize
     )
-    [ "$disk" != "-" ] && args+=( -drive "file=$disk,if=virtio,format=qcow2" )
+    if [ "$disk" != "-" ]; then
+        # .raw — размеченные заглушки (GPT-скрипт), остальное — qcow2
+        case "$disk" in *.raw) args+=( -drive "file=$disk,if=virtio,format=raw" ) ;;
+                         *) args+=( -drive "file=$disk,if=virtio,format=qcow2" ) ;; esac
+    fi
     if [ "$iso" != "-" ]; then
         if [ "${MEDIA:-usb}" = "usb" ]; then
             # реалистичный путь железа: ISO записан на флешку (dd) и
