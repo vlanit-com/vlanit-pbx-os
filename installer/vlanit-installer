@@ -218,12 +218,20 @@ PYEOF
 else
     SYS_HOSTNAME="$(dialog --title "Экран 4. Параметры системы" --inputbox "Hostname:" 8 60 "vlanit-pbx" --stdout)" || exit 1
     ADMIN_USER="$(dialog --title "Локальный администратор" --inputbox "Имя пользователя:" 8 60 "vlanit" --stdout)" || exit 1
-    ADMIN_PASS="$(dialog --title "Пароль администратора" --passwordbox "Пароль (мин. 8 символов, не используйте стандартные пароли):" 8 60 --stdout)" || exit 1
-    [ "${#ADMIN_PASS}" -ge 8 ] || { dialog --msgbox "Пароль короче 8 символов." 7 50; exit 1; }
+    # короткий/невалидный пароль: msgbox и повторный ввод, а не обрыв (issue #44)
+    while :; do
+        ADMIN_PASS="$(dialog --title "Пароль администратора" --passwordbox "Пароль (мин. 8 символов, не используйте стандартные пароли):" 8 60 --stdout)" || exit 1
+        [ "${#ADMIN_PASS}" -ge 8 ] && break
+        dialog --msgbox "Пароль короче 8 символов." 7 50
+    done
     c="$(dialog --title "SSH" --menu "SSH-сервер:" 9 60 3 1 "Включить" 2 "Отключить" --stdout)" || exit 1
     [ "$c" = "2" ] && SSH_ENABLED="no"
-    TZ_NAME="$(dialog --title "Часовой пояс" --inputbox "Часовой пояс (IANA, напр. Europe/Moscow):" 8 60 "Europe/Moscow" --stdout)" || exit 1
-    [ -f "/usr/share/zoneinfo/$TZ_NAME" ] || { dialog --msgbox "Неизвестный часовой пояс: $TZ_NAME" 7 60; exit 1; }
+    # невалидный пояс: msgbox и повторный ввод, а не обрыв (issue #44)
+    while :; do
+        TZ_NAME="$(dialog --title "Часовой пояс" --inputbox "Часовой пояс (IANA, напр. Europe/Moscow):" 8 60 "Europe/Moscow" --stdout)" || exit 1
+        [ -f "/usr/share/zoneinfo/$TZ_NAME" ] && break
+        dialog --msgbox "Неизвестный часовой пояс: $TZ_NAME" 7 60
+    done
     c="$(dialog --title "WireGuard VPN" --menu "Настроить WireGuard (своя пара ключей, автозапуск):" \
         9 64 3 1 "Да, включить" 2 "Нет" --stdout)" || exit 1
     if [ "$c" = "1" ]; then
