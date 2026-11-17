@@ -8,7 +8,11 @@ BUILD_DIR="$PROJECT_ROOT/build"
 STAGING="$BUILD_DIR/iso-staging"
 GRUB_DIR="$BUILD_DIR/grub"
 DIST_DIR="$PROJECT_ROOT/dist"
-ISO_NAME="VLANit-PBX-1.2.9-amd64.iso"
+# имя ISO — из config/build.yaml (output.iso_name), единый источник.
+# Хардкод имени в этом скрипте уже однажды дал релиз с чужим именем
+# файла (1.3.0 собрал артефакты 1.2.9) — имя только из конфигурации.
+ISO_NAME="$(sed -n 's/^  iso_name: //p' "$PROJECT_ROOT/config/build.yaml" | head -1)"
+[ -n "$ISO_NAME" ] || { echo "[iso] ОШИБКА: iso_name не найден в config/build.yaml" >&2; exit 1; }
 mkdir -p "$STAGING/boot/grub" "$GRUB_DIR" "$DIST_DIR"
 
 log() { printf '[iso] %s\n' "$*"; }
