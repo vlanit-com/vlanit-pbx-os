@@ -109,7 +109,13 @@ install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-issue" \
     "$ROOTFS/etc/issue"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-issue" \
     "$ROOTFS/etc/issue.net"
-install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-motd" \
+# версия в макетах (motd) — из config/build.yaml; placeholder @VLANIT_VERSION@,
+# тот же источник, что имя ISO и меню GRUB (50-iso.sh): литерал версии в
+# артефактах уже дважды давал релиз с чужой строкой (1.3.0, 1.3.1).
+DISTRO_VERSION="$(sed -n 's/^  version: //p' "$PROJECT_ROOT/config/build.yaml" | head -1 | tr -d '"')"
+[ -n "$DISTRO_VERSION" ] || { echo "[golden] ОШИБКА: version не найден в config/build.yaml" >&2; exit 1; }
+sed "s/@VLANIT_VERSION@/$DISTRO_VERSION/" "$PROJECT_ROOT/rootfs/etc-motd" > "$BUILD_DIR/motd.rendered"
+install -D -m 0644 "$BUILD_DIR/motd.rendered" \
     "$ROOTFS/etc/motd"
 
 # Параметры контейнера АТС (issue #16): установщик читает и пишет в quadlet
