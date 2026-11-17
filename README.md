@@ -35,12 +35,23 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 ## Системные настройки по умолчанию (1.2.4)
 
 **Диски (LVM под Btrfs, эпик #36/#37).** Разметка каждого диска: ESP 1 ГиБ
-+ PV (остаток); VG `vg0`, LV `root` 40 ГиБ и `data` (остаток); Btrfs с
-subvolumes поверх LV. Один диск — `linear`; два диска — зеркало RAID1
-(`lvcreate --type raid1`, ESP на обоих, fallback `BOOTX64.EFI` на обоих;
-хук local-block принудительно активирует vg0 деградированно в initramfs).
-Спека: `docs/specs/mirror-two-disk.md`, ADR-0004. Проверки:
-`vlanit-doctor` (`lvm-layout`, `lvm-mirror-health`).
++ PV (остаток); VG `vg0`, LV `root` (25 % usable-диска: диск − ESP −
+запас 128 МиБ, ключ `installer.system_size_pct` в `config/build.yaml`)
+и `data` (остаток, минимум 8 ГиБ); Btrfs с subvolumes поверх LV. Один
+диск — `linear`; два диска — зеркало RAID1 (`lvcreate --type raid1`, ESP
+на обоих, fallback `BOOTX64.EFI` на обоих; хук local-block принудительно
+активирует vg0 деградированно в initramfs). Спека:
+`docs/specs/mirror-two-disk.md`, ADR-0004. Проверки: `vlanit-doctor`
+(`lvm-layout`, `lvm-mirror-health`).
+
+**Установщик (1.3.2).** TUI на `dialog` в фирменной теме VLANit
+(`installer/dialogrc`: тёмный фон, золотые акценты; backtitle «VLANit
+PBX OS <версия> — установка»). Экран установки — gauge-прогресс со
+статусами этапов и оценкой оставшегося времени; долгие этапы
+(развёртывание системы, импорт образа MikoPBX) двигают процент по
+фактическому заполнению диска (знаменатель — распакованный размер из
+`release-manifest.yaml`, проставляет `scripts/40-staging.sh`). Спека:
+`docs/specs/1.3.2-installer-ui.md`.
 
 **Сеть (nftables, ADR-0003).** Политика `input: default drop`; открыто только
 необходимое (файл `/etc/nftables.conf` на устройстве):

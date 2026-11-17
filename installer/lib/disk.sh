@@ -51,20 +51,24 @@ partition_disk() {
     udevadm settle 2>/dev/null || true
 }
 
-# Расчёт размера LV data (MiB): по меньшему диску зеркала минус ESP,
-# root-LV и запас под метаданные LVM/dm-raid. Чистая функция (тестируется).
-# lv_data_mib <disk_bytes> [disk_bytes...]
-lv_data_mib() {
+# Usable-диска (MiB): диск без ESP 1024 и запаса метаданных 128.
+# usable_mib <disk_bytes> [disk_bytes...]
+usable_mib() {
     local min_bytes="$1" b
     for b in "$@"; do
         [ "$b" -lt "$min_bytes" ] && min_bytes="$b"
     done
-    local sys_mib
-    sys_mib="$(installer_system_size_mib)"
-    awk -v bytes="$min_bytes" -v sys="$sys_mib" 'BEGIN {
-        mib = bytes / 1024 / 1024
-        print int(mib - 1024 - sys - 128)   # 1024=ESP, 128=запас метаданных
-    }'
+    awk -v bytes="$min_bytes" 'BEGIN { print int(bytes / 1024 / 1024) - 1024 - 128 }'
+}
+
+# Расчёт размера LV data (MiB): usable по меньшему диску зеркала минус
+# root-LV (процент от usable). Чистая функция (тестируется).
+# lv_data_mib <disk_bytes> [disk_bytes...]
+lv_data_mib() {
+    local usable sys_mib
+    usable="$(usable_mib "$@")"
+    sys_mib="$(installer_root_mib "$usable")"
+    awk -v u="$usable" -v sys="$sys_mib" 'BEGIN { print u - sys }'
 }
 
 # Определение имён разделов: nvme0n1p1 vs sda1

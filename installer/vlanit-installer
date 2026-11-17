@@ -5,7 +5,7 @@ set -Eeuo pipefail
 
 export LC_ALL=ru_RU.UTF-8
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for lib in common hardware disk network deploy wireguard; do
+for lib in common hardware disk network deploy wireguard progress; do
     # shellcheck disable=SC1090
     . "$INSTALLER_DIR/lib/$lib.sh"
 done
@@ -23,6 +23,10 @@ if [ -f "$AUTO_FILE" ]; then
     AUTOMODE=1
     log "обнаружен autoinstall: $AUTO_FILE"
 fi
+
+# версия для backtitle всех диалогов (единый источник — release-manifest)
+manifest_version="$(yaml_get "$PAYLOAD/release-manifest.yaml" distro.version 1.0)"
+DIALOG_BACKTITLE="VLANit PBX OS $manifest_version — установка"
 
 # ---------------------------------------------------------------
 # Сбор параметров (интерактивно или из autoinstall.yaml)
@@ -76,20 +80,20 @@ if [ -n "$AUTOMODE" ]; then
         disk_is_clean_target "$MIRROR_DISK" || die "autoinstall: на $MIRROR_DISK есть смонтированные разделы"
     fi
     disk_is_clean_target "$TARGET_DISK" || die "autoinstall: на $TARGET_DISK есть смонтированные разделы"
-    # минимум — из конфигурации, без магических чисел: EFI 1 + System
-    # (system_size_mib) + Data 8, всё в GiB. Переопределение размера можно
-    # задать в autoinstall.yaml (стенд mirror использует для малого профиля).
-    # переопределение — ключ system_size_mib в autoinstall.yaml (малый
-    # профиль стенда mirror); дальше размер читает installer_system_size_mib()
-    SYS_SIZE_MIB_OVERRIDE="$(yaml_get "$AUTO_FILE" system_size_mib "")"
-    export SYS_SIZE_MIB_OVERRIDE
-    sys_mib="$(installer_system_size_mib)"
-    min_gib=$(( (1024 + sys_mib + 8192) / 1024 ))
-    min_bytes=$(( min_gib * 1024 * 1024 * 1024 ))
+    # минимум диска — из конфигурации, без магических чисел: usable
+    # (диск − ESP − запас) должен вместить root (system_size_pct) и
+    # Data ≥ DATA_MIN_GIB. Переопределение процента можно задать в
+    # autoinstall.yaml (стенд mirror использует для малого профиля).
+    SYS_SIZE_PCT_OVERRIDE="$(yaml_get "$AUTO_FILE" system_size_pct "")"
+    export SYS_SIZE_PCT_OVERRIDE
     for d in "$TARGET_DISK" $MIRROR_DISK; do
         size_bytes="$(disk_size_bytes "$d")"
-        [ "$size_bytes" -ge "$min_bytes" ] || \
-            die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно ≥ $min_gib GiB: EFI 1 + System $((sys_mib/1024)) + Data 8)"
+        usable="$(usable_mib "$size_bytes")"
+        sys_mib="$(installer_root_mib "$usable")"
+        data_mib=$(( usable - sys_mib ))
+        min_data_mib=$(( DATA_MIN_GIB * 1024 ))
+        [ "$data_mib" -ge "$min_data_mib" ] || \
+            die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно Data ≥ $DATA_MIN_GIB ГиБ: root $sys_mib МиБ + Data $DATA_MIN_GIB ГиБ + ESP 1 ГиБ)"
     done
 else
     menu_items=()
@@ -249,7 +253,6 @@ fi
 # ---------------------------------------------------------------
 # Экран 5. Подтверждение
 # ---------------------------------------------------------------
-manifest_version="$(yaml_get "$PAYLOAD/release-manifest.yaml" distro.version 1.0)"
 if [ -n "$AUTOMODE" ]; then
     confirm="$(yaml_get "$AUTO_FILE" confirm "")"
     case "$confirm" in
@@ -278,56 +281,90 @@ $summary"
 fi
 
 # ---------------------------------------------------------------
-# Верификация payload (до любых деструктивных операций)
-# ---------------------------------------------------------------
-log "проверка контрольных сумм payload"
-( cd "$PAYLOAD" && sha256sum -c golden.tar.zst.sha256 ) || \
-    die "контрольная сумма golden.tar.zst не соответствует манифесту"
-( cd "$PAYLOAD" && sha256sum -c mikopbx-2026.6.99-amd64.tar.zst.sha256 ) || \
-    die "контрольная сумма mikopbx.tar.zst не соответствует манифесту"
-log "payload корректен"
-
-# ---------------------------------------------------------------
-# Экран 6. Установка
+# Экран 6. Установка (этапы с прогрессом)
 # ---------------------------------------------------------------
 log "=== начало установки на $TARGET_DISK ==="
-if [ -z "$AUTOMODE" ]; then
-    dialog --infobox "Установка запущена.\nЭтапы выводятся в журнал: $LOG_FILE\n\nТерминал: Ctrl+Alt+F2" 8 60
-    sleep 2
-    clear
-fi
-echo "VLANit Installer — журнал: $LOG_FILE"
 
 KERNEL_ARGS=""
 if [ -n "$AUTOMODE" ]; then
     KERNEL_ARGS="$(yaml_get "$AUTO_FILE" kernel_args "")"
+    echo "VLANit Installer — журнал: $LOG_FILE"
+else
+    progress_begin "Установка VLANit PBX OS"
 fi
 
-partition_disk "$TARGET_DISK"
-[ -n "$MIRROR_DISK" ] && partition_disk "$MIRROR_DISK"
-create_storage "$TARGET_DISK" $MIRROR_DISK
-deploy_golden "$TARGET_DISK"
-configure_target_system "$SYS_HOSTNAME" "$ADMIN_USER" "$ADMIN_PASS" "$SSH_ENABLED" "$TZ_NAME" "$KERNEL_ARGS"
-log "write_target_network: старт"
-write_target_network "$SYS_MNT" "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
-log "write_target_network: готово"
-if [ "$WG_ENABLED" = "yes" ]; then
-    configure_target_wireguard "$WG_ADDR" "$WG_PORT" "$WG_PEERS_FILE"
+# распакованные размеры payload проставляет 40-staging.sh (null у ISO
+# до 1.3.2 — тогда суб-прогресс по du отключён, этап идёт скачком)
+golden_bytes="$(yaml_get "$PAYLOAD/release-manifest.yaml" payload.golden_uncompressed 0)"
+mikopbx_bytes="$(yaml_get "$PAYLOAD/release-manifest.yaml" payload.mikopbx_uncompressed 0)"
+case "$golden_bytes" in ''|*[!0-9]*) golden_bytes=0 ;; esac
+case "$mikopbx_bytes" in ''|*[!0-9]*) mikopbx_bytes=0 ;; esac
+
+# --- этапы (обёртки с фиксированной сигнатурой для run_stage) ---
+verify_payload() {
+    ( cd "$PAYLOAD" && sha256sum -c golden.tar.zst.sha256 ) || \
+        die "контрольная сумма golden.tar.zst не соответствует манифесту"
+    ( cd "$PAYLOAD" && sha256sum -c mikopbx-2026.6.99-amd64.tar.zst.sha256 ) || \
+        die "контрольная сумма mikopbx.tar.zst не соответствует манифесту"
+    log "payload корректен"
+}
+stage_partitions() {
+    partition_disk "$TARGET_DISK"
+    [ -z "$MIRROR_DISK" ] || partition_disk "$MIRROR_DISK"
+}
+stage_deploy() { deploy_golden "$TARGET_DISK"; }
+stage_mikopbx_env() { configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$PBX_ADMIN_PASS" "$TZ_NAME"; }
+
+# Верификация payload — до любых деструктивных операций
+run_stage 3 "Проверка контрольных сумм" verify_payload
+run_stage 8 "Разметка дисков" stage_partitions
+run_stage 13 "Хранилище (LVM, Btrfs)" create_storage "$TARGET_DISK" $MIRROR_DISK
+
+if [ -n "$AUTOMODE" ]; then
+    run_stage 60 "Развёртывание системы" stage_deploy
+else
+    # долгий этап: честный суб-прогресс по заполнению каталога
+    stage_with_size_progress 13 60 "Развёртывание системы" \
+        "$SYS_MNT" "$golden_bytes" stage_deploy
 fi
-configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$PBX_ADMIN_PASS" "$TZ_NAME"
-import_mikopbx_image
-post_install_report "$TARGET_DISK"
-install_bootloader $MIRROR_DISK
+
+run_stage 65 "Конфигурация системы" \
+    configure_target_system "$SYS_HOSTNAME" "$ADMIN_USER" "$ADMIN_PASS" "$SSH_ENABLED" "$TZ_NAME" "$KERNEL_ARGS"
+run_stage 68 "Настройка сети" \
+    write_target_network "$SYS_MNT" "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
+if [ "$WG_ENABLED" = "yes" ]; then
+    run_stage 70 "Настройка WireGuard" configure_target_wireguard "$WG_ADDR" "$WG_PORT" "$WG_PEERS_FILE"
+fi
+run_stage 72 "Настройка MikoPBX" stage_mikopbx_env
+
+if [ -n "$AUTOMODE" ]; then
+    run_stage 85 "Импорт образа MikoPBX" import_mikopbx_image
+else
+    stage_with_size_progress 72 85 "Импорт образа MikoPBX" \
+        "$SYS_MNT/var/lib/containers" "$mikopbx_bytes" import_mikopbx_image
+fi
+
+run_stage 95 "Загрузчик (initramfs, GRUB)" install_bootloader $MIRROR_DISK
+
+# базовый snapshot после установки (по метке — LV, а не раздел)
+stage_finalize() {
+    post_install_report "$TARGET_DISK"
+    mount -o subvolid=5 LABEL=vlanit-system /mnt 2>/dev/null && {
+        btrfs subvolume snapshot -r /mnt/@ /mnt/@snapshots/post-install-@ 2>/dev/null || true
+        umount /mnt
+    } || true
+}
+run_stage 98 "Финальные операции" stage_finalize
+
 WG_PUBKEY=""
 [ "$WG_ENABLED" = "yes" ] && WG_PUBKEY="$(wireguard_pubkey)"
 unmount_target
 
-# базовый snapshot после установки (по метке — LV, а не раздел)
-mount -o subvolid=5 LABEL=vlanit-system /mnt 2>/dev/null && {
-    btrfs subvolume snapshot -r /mnt/@ /mnt/@snapshots/post-install-@ 2>/dev/null || true
-    umount /mnt
-} || true
-log "=== установка завершена ==="
+if [ -z "$AUTOMODE" ]; then
+    progress_end
+else
+    log "=== установка завершена ==="
+fi
 
 # ---------------------------------------------------------------
 # Экран 7. Завершение

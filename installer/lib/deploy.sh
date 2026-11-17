@@ -13,8 +13,9 @@ LV_DATA="/dev/${VG_NAME}/data"
 # $1 — основной диск, $2 — (опционально) второй диск зеркала.
 create_storage() {
     local disk_a="$1" disk_b="${2:-}"
-    local sys_mib data_mib
-    sys_mib="$(installer_system_size_mib)"
+    local sys_mib data_mib usable
+    usable="$(usable_mib "$(disk_size_bytes "$disk_a")" ${disk_b:+"$(disk_size_bytes "$disk_b")"})"
+    sys_mib="$(installer_root_mib "$usable")"
 
     log "PV: $(partition_device "$disk_a" 2)"
     pvcreate -y "$(partition_device "$disk_a" 2)" || die "pvcreate не выполнен"

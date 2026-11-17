@@ -421,8 +421,8 @@ test_mirror() {
     local diskA="$TESTDIR/${tag}_A.qcow2" diskB="$TESTDIR/${tag}_B.qcow2" diskN="$TESTDIR/${tag}_N.qcow2"
     local log_p
 
-    # Малый профиль: system_size_mib: 3072 в autoinstall-mirror.yaml
-    # (root 3 ГиБ, диски 13 ГиБ) — initial sync ~12 ГБ вместо ~63,
+    # Малый профиль: system_size_pct: 25 в autoinstall-mirror.yaml
+    # (root ≈3 ГиБ на дисках 13 ГиБ) — initial sync ~12 ГБ вместо ~63,
     # место хоста ~16 ГБ на прогон вместо ~70. Логика зеркала от
     # размера не зависит; продакшн-размеры — полевой тест.
     make_test_iso "$iso" /autoinstall.yaml=tests/integration/autoinstall-mirror.yaml
