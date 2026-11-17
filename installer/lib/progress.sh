@@ -58,7 +58,9 @@ run_stage() {
     if [ -n "$AUTOMODE" ]; then
         "$@"
     else
-        { "$@" >> "$LOG_FILE" 2>&1; } || { progress_abort; die "сбой этапа: $text"; }
+        # stdin — /dev/null: tty0 занят gauge-диалогом, чтение из него
+        # зависло бы навсегда (интерактив-регрессия 1.3.2)
+        { "$@" >> "$LOG_FILE" 2>&1; } </dev/null || { progress_abort; die "сбой этапа: $text"; }
     fi
 }
 
@@ -72,7 +74,7 @@ stage_with_size_progress() {
     local from="$1" to="$2" text="$3" target="$4" total="$5"
     shift 5
     log "этап (size-progress $from→$to %): $text"
-    "$@" >> "$LOG_FILE" 2>&1 &
+    "$@" >> "$LOG_FILE" 2>&1 </dev/null &
     local pid=$! cur pct
     while kill -0 "$pid" 2>/dev/null; do
         cur="$(du -sb "$target" 2>/dev/null | awk '{print $1}')"
