@@ -103,8 +103,9 @@ if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
                 && sgdisk --zap-all "$newdisk" >/dev/null 2>&1 \
                 && sgdisk -n1:1MiB:+1024MiB -t1:EF00 -c1:"VLANIT_EFI" "$newdisk" >/dev/null \
                 && sgdisk -n2:0:0 -t2:8E00 -c2:"VLANIT_LVM" "$newdisk" >/dev/null \
-                && partprobe "$newdisk" >/dev/null 2>&1 \
-                && { for _w in $(seq 1 15); do [ -b "$pvpart" ] && break; sleep 1; done; [ -b "$pvpart" ]; } \
+                && { partprobe "$newdisk" >/dev/null 2>&1 || true
+                     for _w in $(seq 1 15); do [ -b "$pvpart" ] && break; sleep 1; done
+                     [ -b "$pvpart" ]; } \
                 && pvcreate -y "$pvpart" >/dev/null \
                 && vgextend vg0 "$pvpart" >/dev/null \
                 && lvconvert -y --repair vg0/root >/dev/null 2>&1 \
