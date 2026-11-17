@@ -440,8 +440,9 @@ test_mirror() {
     rm -f "$dummy"
     qemu-img create -f raw "$dummy" 20M >/dev/null
     DUMMY_ABS="$(realpath "$dummy")"
-    sgdisk -n1:0:0 -t1:0700 "$DUMMY_ABS" >/dev/null
-    sgdisk -p "$DUMMY_ABS" | grep -q "partition" || die "заглушка: разметка не создана"
+    # sgdisk на хосте нет — GPT пишем скриптом (scripts/make_dummy_gpt.py)
+    python3 "$PROJECT_ROOT/scripts/make_dummy_gpt.py" "$DUMMY_ABS" >/dev/null \
+        || die "заглушка: разметка не создана"
 
     # фаза 1: установка на зеркало (vda target, vdb mirror)
     run_qemu "${tag}_p1" "$iso" "$diskA" \

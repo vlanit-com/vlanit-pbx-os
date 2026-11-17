@@ -62,9 +62,9 @@ def header(this_lba, other_lba, entries_lba):
 with open(path, "r+b") as f:
     # защитный MBR
     mbr = bytearray(512)
-    mbr[446:462] = struct.pack("<B3sB3sB3sII",
+    mbr[446:462] = struct.pack("<B3sB3sII",
                                0x00, b"\x00\x02\x00", 0xEE, b"\xFF\xFF\xFF",
-                               b"\x00\x02\x00", 1, min(total_lba - 1, 0xFFFFFFFF))
+                               1, min(total_lba - 1, 0xFFFFFFFF))
     mbr[510:512] = b"\x55\xAA"
     f.seek(0)
     f.write(mbr)
