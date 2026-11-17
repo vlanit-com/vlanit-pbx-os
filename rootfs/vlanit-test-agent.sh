@@ -82,8 +82,15 @@ if grep -q 'VLANIT_MIRROR=1' /proc/cmdline; then
         out "INFO mirror: vg0 деградирован ($npv_vg0 PV в системе)"
         newdisk=""
         while read -r dev; do
-            pvs --noheadings -o pv_name 2>/dev/null | grep -q "/dev/${dev}" && continue
-            lsblk -n -o NAME "/dev/$dev" 2>/dev/null | tail -n +2 | grep -q . && continue
+            # размер ≥5 ГБ: исключает заглушку слота и любые мелкие фантомы
+            dsize="$(lsblk -b -d -n -o SIZE "/dev/$dev" 2>/dev/null | tr -d ' ')"
+            case "$dsize" in ''|*[!0-9]*) dsize=0 ;; esac
+            haspv="$(pvs --noheadings -o pv_name 2>/dev/null | grep -c "/dev/${dev}")"
+            hasparts="$(lsblk -n -o NAME "/dev/$dev" 2>/dev/null | tail -n +2 | grep -c .)"
+            out "DIAG disk-cand: /dev/$dev size=${dsize}B pv=$haspv parts=$hasparts"
+            [ "$dsize" -ge 5368709120 ] || continue
+            [ "$haspv" -ge 1 ] && continue
+            [ "$hasparts" -ge 1 ] && continue
             newdisk="/dev/$dev"; break
         done < <(lsblk -b -d -n -o NAME,TYPE,RM,RO | awk '$2=="disk" && $3=="0" && $4=="0" {print $1}')
         if [ -z "$newdisk" ]; then
