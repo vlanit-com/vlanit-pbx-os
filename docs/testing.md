@@ -231,6 +231,19 @@ quadlet-service, mikopbx-ready-banner, mikopbx-service-active,
 mikopbx-webui, mikopbx-api-login, mikopbx-cf-nonempty,
 reboot-data-persisted, reboot-mikopbx-active.
 
+## Performance baseline (Т11)
+
+Замер в каждом прогоне Т2 (`scripts/test-qemu.sh install` →
+`scripts/perf-baseline.sh`). Отклонение >20% к предыдущей строке —
+WARN, не FAIL. Спека: `docs/specs/t11-performance-baseline.md`.
+Отключить запись в этот файл: `PERF_BASELINE_UPDATE=0`.
+
+<!-- T11-BASELINE-START -->
+| дата | версия | ISO МиБ | install_sec | agent_sec | iso_to_web_sec | заметка |
+|---|---|---|---|---|---|---|
+| 2026-11-18 | 1.3.1 | 786 | — | — | — | seed: размер dist/VLANit-PBX-1.3.1 до первого T2 на 1.3.2 |
+<!-- T11-BASELINE-END -->
+
 ## Интерактивные проверки 1.3.2 (TUI-мастер, стенд QEMU)
 
 Одна фича — одна проверка; проходятся sendkey-проходом мастера:
@@ -256,6 +269,8 @@ reboot-data-persisted, reboot-mikopbx-active.
 - Проверка SIP-регистрации/звонка (требуется SIP-клиент/транк).
 - Загрузка Legacy BIOS (не поддерживается в v1; fallback `EFI/BOOT/BOOTX64.EFI` на целевом ESP добавлен).
 - Secure Boot (не входит в v1).
+- **Полевой первый бокс (#42)** — чеклист: `docs/specs/field-first-box.md`
+  (зеркало на двух SSD, паритет, выдержка; результаты — сюда вручную).
 
 ## Воспроизводимость сборки
 

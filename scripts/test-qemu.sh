@@ -193,11 +193,13 @@ test_boot() {
 }
 
 # Фаза 1: установка (ISO). Фаза 2: первая загрузка с диска (без ISO).
+# Т11: пишет $TESTDIR/${tag}_perf.env (install_sec, agent_sec, p1_start).
 install_two_phases() {
     local tag="$1" net="${2:-user}" yaml="${3:-tests/integration/autoinstall.yaml}"
     local p1="${tag}_p1" p2="${tag}_p2"
     local disk="$TESTDIR/${tag}_disk.qcow2"
     local iso="$TESTDIR/${tag}.iso"
+    local t_p1_start t_install_done t_p2_start t_agent_done
 
     make_test_iso "$iso" /autoinstall.yaml="$yaml"
     rm -f "$disk" "$TESTDIR/${p1}_serial.log" "$TESTDIR/${p2}_serial.log"
@@ -208,6 +210,7 @@ install_two_phases() {
     if [ "$net" = "user" ]; then
         netargs1=( -netdev "user,id=n0" -device virtio-net-pci,netdev=n0 )
     fi
+    t_p1_start="$(date +%s)"
     run_qemu "$p1" "$iso" "$disk" "${netargs1[@]}"
     sleep 35; shot "01-install-progress" "$p1"   # этап разметки/развёртывания
     if ! wait_serial "$TESTDIR/${p1}_serial.log" "VLANIT_INSTALL_DONE" 1800; then
@@ -217,6 +220,7 @@ install_two_phases() {
         kill_qemu "$p1"
         return 1
     fi
+    t_install_done="$(date +%s)"
     shot "02-install-finished" "$p1"
     grep -q "VLANIT_EFI" "$TESTDIR/${p1}_serial.log" \
         && pass "$tag: GPT-разметка выполнена" || fail "$tag: нет подтверждения разметки"
@@ -227,16 +231,25 @@ install_two_phases() {
     if [ "$net" = "user" ]; then
         netargs2=( -netdev "user,id=n0,hostfwd=tcp::8443-:443" -device virtio-net-pci,netdev=n0 )
     fi
+    t_p2_start="$(date +%s)"
     run_qemu "$p2" "-" "$disk" "${netargs2[@]}"
     if wait_serial "$TESTDIR/${p2}_serial.log" "VLANIT_TEST_PASS" 1800; then
+        t_agent_done="$(date +%s)"
         sleep 5; shot "03-installed-system" "$p2"   # консоль установленной системы
         pass "$tag: первая загрузка с диска, все проверки агента пройдены"
     elif wait_serial "$TESTDIR/${p2}_serial.log" "VLANIT_TEST_FAIL" 1800; then
+        t_agent_done="$(date +%s)"
         report_failures "$TESTDIR/${p2}_serial.log"
         fail "$tag: проверки агента не пройдены"
     else
         fail "$tag: таймаут фазы 2 (см. $TESTDIR/${p2}_serial.log)"
+        return 1
     fi
+    {
+        echo "p1_start=$t_p1_start"
+        echo "install_sec=$((t_install_done - t_p1_start))"
+        echo "agent_sec=$((t_agent_done - t_p2_start))"
+    } > "$TESTDIR/${tag}_perf.env"
     return 0
 }
 
@@ -246,10 +259,38 @@ test_install() {
 
     # внешняя проверка веб-интерфейса через hostfwd (ВМ t2_p2 ещё жива)
     sleep 5
+    local t_web="" web_ok=0
     if curl -sk --max-time 15 https://127.0.0.1:8443/ -o /dev/null; then
+        t_web="$(date +%s)"
+        web_ok=1
         pass "T4: веб-интерфейс MikoPBX доступен с хоста (https://127.0.0.1:8443)"
     else
         fail "T4: веб-интерфейс недоступен с хоста"
+    fi
+
+    # Т11: метрики прогона → $TESTDIR/perf-baseline.txt (+ строка в testing.md)
+    if [ -f "$TESTDIR/t2_perf.env" ]; then
+        # shellcheck disable=SC1091
+        . "$TESTDIR/t2_perf.env"
+        local iso_to_web=""
+        if [ -n "$t_web" ] && [ -n "${p1_start:-}" ]; then
+            iso_to_web=$((t_web - p1_start))
+        fi
+        local perf_out="$TESTDIR/perf-baseline.txt"
+        bash "$PROJECT_ROOT/scripts/perf-baseline.sh" record \
+            --out "$perf_out" \
+            --version "$VERSION" \
+            --iso "$ISO" \
+            --install-sec "${install_sec:-}" \
+            --agent-sec "${agent_sec:-}" \
+            --iso-to-web-sec "${iso_to_web:-}" \
+            --note "T2 QEMU web_ok=$web_ok rundir=$(basename "$TESTDIR")" \
+            | while read -r row; do printf 'Т11: %s\n' "$row"; done
+        if [ "${PERF_BASELINE_UPDATE:-1}" = "1" ]; then
+            bash "$PROJECT_ROOT/scripts/perf-baseline.sh" append-docs "$perf_out" \
+                || fail "Т11: не удалось записать docs/testing.md"
+        fi
+        pass "Т11: performance baseline записан ($perf_out)"
     fi
     kill_qemu t2_p2
 }
