@@ -236,16 +236,16 @@ reboot-data-persisted, reboot-mikopbx-active.
 Одна фича — одна проверка; проходятся sendkey-проходом мастера:
 
 - installer-gauge-progress — экран установки: gauge со статусами этапов
-  и оценкой «осталось ~N мин» (не «~0 мин»); скриншоты walk132c/w10.
+  и оценкой «осталось ~N мин» (не «~0 мин»); скриншоты release-shots/1.3.2/09-11-gauge.
 - installer-brand-theme — все диалоги мастера в фирменной теме
-  (dialogrc) с backtitle версии; скриншоты walk132c/w01.
+  (dialogrc) с backtitle версии; скриншоты release-shots/1.3.2/02-08.
 - disk-pct-geometry — root-LV = system_size_pct % usable-диска: lvs
-  root 9.72g + data 29.16g на дисках 40 ГиБ; скриншот walk132c/w23.
+  root 9.72g + data 29.16g на дисках 40 ГиБ; скриншот release-shots/1.3.2/15-lvs.
 - installer-short-password-loop — пароль <8 символов возвращает в поле
-  ввода, не обрывает установку (issue #44; факты — ver44).
+  ввода, не обрывает установку (issue #44; факты: ver44/*-retry.png, галерея 10-11).
 - firstboot-not-delayed-by-heal — userspace загрузки без ~2,5 мин
   ожидания vlanit-atc-password-heal, firstboot-done при первой загрузке
-  (issue #45; факты — ver44).
+  (issue #45; факты: userspace 1min 25s, heal в mikopbx.service.wants, firstboot-done при первой загрузке).
 - plymouth-brand-splash — фирменная заставка на загрузке live и
   установленной системы (факты — verply).
 
