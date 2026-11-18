@@ -44,14 +44,12 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 `docs/specs/mirror-two-disk.md`, ADR-0004. Проверки: `vlanit-doctor`
 (`lvm-layout`, `lvm-mirror-health`).
 
-**Установщик (1.3.2).** TUI на `dialog` в фирменной теме VLANit
-(`installer/dialogrc`: тёмный фон, золотые акценты; backtitle «VLANit
-PBX OS <версия> — установка»). Экран установки — gauge-прогресс со
-статусами этапов и оценкой оставшегося времени; долгие этапы
-(развёртывание системы, импорт образа MikoPBX) двигают процент по
-фактическому заполнению диска (знаменатель — распакованный размер из
-`release-manifest.yaml`, проставляет `scripts/40-staging.sh`). Спека:
-`docs/specs/1.3.2-installer-ui.md`.
+**Установщик (1.3.3).** TUI на `dialog` в фирменной теме VLANit
+(`installer/dialogrc`: все ключи явно — чёрный фон, золотые рамки/
+заголовки, выделение чёрный-на-белом; backtitle «VLANit PBX OS
+<версия> — установка»). С 1.3.3 нет утечки defaults Debian в menubox/
+form. Экран установки — gauge со статусами и ETA. Спеки:
+`docs/specs/1.3.2-installer-ui.md`, `docs/specs/1.3.3-installer-theme.md`.
 
 **Сеть (nftables, ADR-0003).** Политика `input: default drop`; открыто только
 необходимое (файл `/etc/nftables.conf` на устройстве):
@@ -166,7 +164,7 @@ bash scripts/sign-release.sh   # dist/*.iso.sha256 -> .asc
 # с подписанными контрольными суммами (идея #11, см. ниже «Правило релизов»)
 
 # запись на USB (требует root, ДЕСТРУКТИВНО)
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.3.2-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.3.3-amd64.iso /dev/sdX
 # другие способы (dd, GNOME Disks, KDE ISO Image Writer, Rufus, balenaEtcher,
 # macOS dd, Ventoy) — docs/installation.md, раздел «Создание загрузочной флэшки»
 
@@ -177,8 +175,8 @@ make clean          # очистка build/{rootfs,live,iso-staging}, dist
 
 | Путь | Назначение |
 |---|---|
-| `dist/VLANit-PBX-1.3.2-amd64.iso` | итоговый загрузочный ISO (UEFI) |
-| `dist/VLANit-PBX-1.3.2-amd64.iso.sha256` | контрольная сумма |
+| `dist/VLANit-PBX-1.3.3-amd64.iso` | итоговый загрузочный ISO (UEFI) |
+| `dist/VLANit-PBX-1.3.3-amd64.iso.sha256` | контрольная сумма |
 | `build/payload/mikopbx-*.tar.zst` | экспортированный образ MikoPBX (+sha256) |
 | `build/payload/golden.tar.zst` | Golden Image устанавливаемой системы |
 | `build/logs/` | журналы шагов сборки |

@@ -249,9 +249,14 @@ WARN, не FAIL. Спека: `docs/specs/t11-performance-baseline.md`.
 Одна фича — одна проверка; проходятся sendkey-проходом мастера:
 
 - installer-gauge-progress — экран установки: gauge со статусами этапов
-  и оценкой «осталось ~N мин» (не «~0 мин»); скриншоты release-shots/1.3.2/09-11-gauge.
+  и оценкой «осталось ~N мин» (не «~0 мин»); скриншоты
+  release-shots/1.3.3/09–11 (регресс темы — 1.3.2/09-11-gauge).
 - installer-brand-theme — все диалоги мастера в фирменной теме
-  (dialogrc) с backtitle версии; скриншоты release-shots/1.3.2/02-08.
+  (полный dialogrc 1.3.3: без серого menubox/defaults Debian; backtitle
+  версии); скриншоты release-shots/1.3.3/02–08; спека
+  `docs/specs/1.3.3-installer-theme.md`; галерея
+  `docs/installer-theme-gallery.md`; прогон
+  `scripts/shot-installer-walk.sh`.
 - disk-pct-geometry — root-LV = system_size_pct % usable-диска: lvs
   root 9.72g + data 29.16g на дисках 40 ГиБ; скриншот release-shots/1.3.2/15-lvs.
 - installer-short-password-loop — пароль <8 символов возвращает в поле
