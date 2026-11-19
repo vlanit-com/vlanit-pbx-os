@@ -1,32 +1,39 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Shown to AI when creating OpenSpec artifacts (project-local).
+context: |
+  VLANit PBX OS: Debian 13 appliance ISO + installer + MikoPBX (Podman).
+  Installer changes (except version bump) go through OpenSpec.
+  During implementation the change under openspec/changes/<id>/ is the
+  requirements source of truth. docs/specs/ is as-built / field specs.
+  Wiki is end-user/ops docs — do not paste full specs there.
+  Do not re-run openspec init on this already-initialized project.
+  Agent packs: docs/agent/openspec.md and docs/agent/installer-gui.md.
+  Keep artifacts concise; prefer updating tasks over rewriting plans.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Keep proposals focused; include an explicit Non-goals section
+    - "State source-of-truth: this change vs docs/specs vs wiki"
+    - Do not duplicate full docs/specs content into the proposal
+  design:
+    - Record rejected alternatives briefly
+    - Call out verify impact (unit vs ISO/QEMU) without pasting logs
+  tasks:
+    - Tasks must be actionable checkboxes; one concern per item
+    - If scope changes, update tasks before more implementation
+    - Do not re-plan from scratch when existing tasks remain valid
+  specs:
+    - Delta specs only for requirements that change
+    - Avoid copying entire parallel docs/specs documents
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Follow openspec/changes/<id>/tasks.md; do not invent a second plan
+      - Write/update openspec/changes/<id>/checkpoint.md on pause or agent switch
+      - Keep test summaries concise; see docs/agent/verification.md
+  archive:
+    guidance:
+      - Summarize archive outcome; sync as-built notes in docs/specs if behavior differs
+      - Remove or close the change checkpoint after successful archive
