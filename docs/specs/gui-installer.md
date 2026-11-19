@@ -1,6 +1,6 @@
 # Спека: GUI-установщик HTML + Cursive fallback (идея #12)
 
-Статус: as-built (ветка `feature/gui-installer`, 2026-11-19).
+Статус: **as-built / эпик #46 закрыт** (релизы 1.4.0–1.4.1, 2026-11-19).
 
 ## Корень
 
@@ -20,7 +20,7 @@ multi-field формы. Нужен графический primary с обяза�
   `theme.css`, logo); `VLANIT_BRANDING` (default `default`).
 - **WireGuard:** отдельный collect-экран (вкл после установки / нет +
   адрес/порт).
-- **Fallback:** `vlanit-tui` (Cursive), затем `dialog`.
+- **Fallback:** `vlanit-tui` (Cursive), затем `dialog` (переходный).
 - **Контракт:** `/run/vlanit/install-config.json` + `vlanit-probe`;
   stages — `install-run.sh`. Autoinstall YAML без смены схемы.
 - **Сборка TUI:** `scripts/build-tui.sh` → `installer/bin/vlanit-tui`.
@@ -30,16 +30,24 @@ multi-field формы. Нужен графический primary с обяза�
 - X/Chromium, Calamares/Agama, GTK/Qt, whiptail как primary.
 - Полный YAML-драйвер Cursive (пока handlers в Rust).
 
-## Проверка
+## Проверка (факты закрытия эпика)
 
-- `openspec validate installer-wg-step-form-align`
-- Unit: `tests/unit/test-config-json.sh`
-- Shots: `bash scripts/shot-gui-html.sh`
-- Autoinstall QEMU: `scripts/test-qemu.sh` (UI не участвует)
-- Fallback: `vlanit.ui=tui|dialog`
+- OpenSpec `installer-wg-step-form-align` → archived
+  `openspec/changes/archive/2026-11-19-installer-wg-step-form-align/`
+- Unit: `tests/unit/test-config-json.sh` PASS
+- Shots: `docs/gui-installer/shots/` (`scripts/shot-gui-html.sh`)
+- Регресс QEMU: `regress-full.sh` Т1–Т9+mirror PASS на ISO 1.4.0
+  (`docs/testing.md`)
+- Релиз: теги `v1.4.0` / `v1.4.1`, wiki Installation-Screens / Branding
+- Fallback cmdline: `vlanit.ui=gui|tui|dialog`
 
-## Открытые пункты
+Критерий эпика #46 (код + стенд + docs/wiki) — выполнен. Полевой
+netsurf-fb / скрины с флота — **не** критерий закрытия эпика; вынесены
+в follow-up (см. ниже).
 
-- Полевой прогон netsurf-fb на ≥2 моделях.
-- Скриншоты с live ISO на флоте — до GA.
-- Удаление dialog-пути после стабилизации Cursive.
+## Follow-up (вне эпика)
+
+- Полевой прогон GUI/`netsurf-fb` на ≥2 моделях + скрины live ISO —
+  issue #49; пересекается с #42.
+- Удаление dialog-пути — после стабилизации Cursive на флоте (отдельный
+  issue, не сейчас).
