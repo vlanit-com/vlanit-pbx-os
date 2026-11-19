@@ -165,6 +165,8 @@ install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-fail2ban-vlanit-sshd.conf" \
 # текстовом фолбэке и графический splash не показывается (spec 1.3.2)
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-initramfs-tools-modules" \
     "$ROOTFS/etc/initramfs-tools/modules"
+# #29/#30/#32 — после тем и пакетов
+"$PROJECT_ROOT/scripts/slim-rootfs.sh" "$ROOTFS"
 
 # кириллица на консоли (trixie: шрифты только в console-setup)
 cat > "$ROOTFS/etc/vconsole.conf" <<'EOF'

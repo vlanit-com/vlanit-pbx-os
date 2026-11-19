@@ -14,10 +14,14 @@ log() { printf '[initramfs] %s\n' "$*"; }
 KERNEL_VERSION="$(basename "$(ls -d "$ROOTFS"/lib/modules/* | head -1)")"
 log "ядро: $KERNEL_VERSION"
 
-# синхронизация актуальных live-файлов (hook, init) в rootfs
+# синхронизация актуальных live-файлов (hook, init, MODULES=list) в rootfs
 install -D -m 0755 "$PROJECT_ROOT/live/vlanit-init" "$ROOTFS/opt/vlanit/vlanit-init"
 install -D -m 0755 "$PROJECT_ROOT/live/initramfs-hook-vlanit-live" \
     "$ROOTFS/etc/initramfs-tools/hooks/vlanit-live"
+install -D -m 0644 "$PROJECT_ROOT/live/initramfs-conf.d-vlanit-live.conf" \
+    "$ROOTFS/etc/initramfs-tools/conf.d/vlanit-live.conf"
+install -D -m 0644 "$PROJECT_ROOT/live/initramfs-modules-vlanit-live" \
+    "$ROOTFS/etc/initramfs-tools/modules"
 # полная синхронизация installer (GUI/Cursive/libs) — cp, не частичный список
 rm -rf "$ROOTFS/opt/vlanit/installer"
 cp -a "$PROJECT_ROOT/installer/." "$ROOTFS/opt/vlanit/installer/"
