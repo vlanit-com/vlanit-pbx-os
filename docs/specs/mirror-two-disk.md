@@ -76,9 +76,9 @@ LV (оба — `raid1`, по легу на каждый PV):
   ниже, в LVM).
 - GRUB ставится на ESP обоих дисков (повторный `grub-install` + копия
   fallback); при пропаже любого диска firmware грузит ESP другого.
-- Замена диска (runbook в wiki): диск → `pvcreate` →
-  `lvconvert --replace <oldpv> vg0/root vg0/data` → resync в фоне
-  (проверить точный синтаксис на стенде; зафиксировать в runbook).
+- Замена диска (wiki [Mirror-Disk-Replace](https://github.com/vlanit-com/vlanit-pbx-os/wiki/Mirror-Disk-Replace)):
+  разметка → `pvcreate` → `vgextend` → `lvconvert --repair vg0/root|data`
+  → копия ESP → resync. Стенд Т-mirror: REPLACE_PASS (`--repair`, не `--replace`).
 
 ### Установщик
 
