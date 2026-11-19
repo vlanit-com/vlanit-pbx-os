@@ -49,8 +49,9 @@ cmd_record() {
         echo "install_sec=${install_sec:-}"
         echo "agent_sec=${agent_sec:-}"
         echo "iso_to_web_sec=${iso_to_web_sec:-}"
-        echo "note=${note:-}"
-        [ -n "$iso_path" ] && echo "iso_path=$iso_path"
+        # %q — пробелы в note (напр. «T2 QEMU …») иначе ломают source в format/append
+        printf 'note=%q\n' "${note:-}"
+        [ -n "$iso_path" ] && printf 'iso_path=%q\n' "$iso_path"
     } > "$out"
 
     cmd_format "$out"

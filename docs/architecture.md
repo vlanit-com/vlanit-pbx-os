@@ -6,7 +6,7 @@
 Сборочная машина (docker)
   Dockerfile.build (Debian 13 + mmdebstrap/xorriso/grub)
     10-golden-rootfs.sh   Golden Image: Debian 13 + podman + VLANit-службы
-    20-live-rootfs.sh     Live-среда: ядро + установщик (dialog) -> squashfs
+    20-live-rootfs.sh     Live: ядро + GUI/TUI установщик + netsurf-fb -> squashfs
     30-initramfs.sh       initramfs с кастомным vlanit-init
     40-staging.sh         payload + release-manifest
     50-iso.sh             GRUB UEFI + xorriso -> dist/*.iso
@@ -15,8 +15,10 @@
   ISO (VLANIT_PBX_OS)
     -> GRUB -> vmlinuz + initrd (vlanit-init)
        -> монтирование /dev/sr0 по метке, squashfs + overlayfs (tmpfs)
-       -> switch_root -> systemd -> VLANit Installer (TUI, tty1)
-            -> разметка GPT: EFI 1GiB + LVM PV (остаток), vg0: root 40GiB / data (остаток)
+       -> switch_root -> systemd -> VLANit Installer
+            (primary: HTML+netsurf-fb; fallback: vlanit-tui / dialog)
+            -> разметка GPT: EFI 1GiB + LVM PV; vg0: root = system_size_pct %
+               usable, data = остаток (минимум Data ≥ DATA_MIN_GIB)
             -> Btrfs поверх LV: @, @var_log, @snapshots | mikopbx-cf, mikopbx-storage
             -> два диска: LV типа raid1 (зеркало), ESP на обоих дисках
             -> развёртывание Golden Image, fstab по UUID
@@ -30,7 +32,8 @@
 ## Golden Image
 
 Переносимый образ файловой системы (tar.zst), а не поблочный образ диска —
-поэтому установка возможна на накопители любого размера (≥ 50 GiB).
+поэтому установка возможна на накопители разного размера (минимум —
+Data-LV ≥ 8 GiB; продакшен ≥ 50 GiB).
 
 Из Golden Image удаляются все уникальные идентификаторы: machine-id
 (пустой файл → systemd генерирует при первой загрузке), SSH host keys,
@@ -168,6 +171,18 @@ logind (`/etc/systemd/logind.conf.d/01-vlanit.conf`, 1.2.4):
   rootfs/etc-vlanit-release.pub --verify <file>.sha256.asc`, затем
   `sha256sum -c <file>.sha256`.
 - Спека: `docs/specs/1.2.6-ci-release.md`.
+
+## UI установщика (1.4.0)
+
+- Реестр экранов: `installer/screens.yaml` (id / title / enabled / phase).
+  GUI ходит только по `enabled: true` collect; handlers в
+  `installer/gui/server.py` (`RENDERERS`).
+- Шаблоны: `installer/gui/templates/layout.html`.
+- Брендинг: `installer/branding/<profile>/` + `VLANIT_BRANDING`
+  (default `default`).
+- Контракт данных: `/run/vlanit/install-config.json` через
+  `vlanit-probe` + `config-json.sh`; этапы — `install-run.sh`.
+- Спека / галерея: `docs/specs/gui-installer.md`, `docs/gui-installer.md`.
 
 ## Безопасность установщика
 

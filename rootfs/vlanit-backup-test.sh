@@ -18,6 +18,18 @@ if ! mountpoint -q "$USB_MNT"; then
 fi
 mountpoint -q "$USB_MNT" || { bad "usb-mount"; out "RESULT FAIL"; exit 1; }
 
+# Дождаться АТС и томов данных: иначе vlanit-backup на раннем multi-user
+# молча падал (du/pipefail) → FAIL backup-created за <1с.
+ready=0
+for _ in $(seq 1 90); do
+    if systemctl is-active --quiet mikopbx.service \
+       && [ -d /var/spool/mikopbx/storage ] && [ -d /var/spool/mikopbx/cf ]; then
+        ready=1; break
+    fi
+    sleep 2
+done
+[ "$ready" -eq 1 ] || out "WARN mikopbx-not-ready-after-180s"
+
 PHASE="$(cat "$PHASE_FILE" 2>/dev/null || echo 1)"
 
 case "$PHASE" in

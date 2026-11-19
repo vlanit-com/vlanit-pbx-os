@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <rect width="640" height="160" fill="#111111"/>
+  <text x="16" y="28" fill="#e6b800" font-family="DejaVu Sans,sans-serif" font-size="16">Disk layout</text>
+  <rect x="16" y="48" width="90" height="60" fill="#333333" stroke="#e6b800"/>
+  <text x="28" y="84" fill="#eeeeee" font-size="12">ESP 1GiB</text>
+  <rect x="112" y="48" width="160" height="60" fill="#2a2a2a" stroke="#888888"/>
+  <text x="140" y="84" fill="#eeeeee" font-size="12">System LVM</text>
+  <rect x="278" y="48" width="340" height="60" fill="#1a1a1a" stroke="#666666"/>
+  <text x="400" y="84" fill="#eeeeee" font-size="12">Data LVM/Btrfs</text>
+  <text x="16" y="140" fill="#aaaaaa" font-size="12">GPT / UEFI / VG vg0</text>
+</svg>

@@ -24,6 +24,10 @@ log "проверка SHA256 payload"
 ( cd "$BUILD_DIR/payload" && sha256sum -c mikopbx.tar.zst.sha256 ) || \
     fail "контрольная сумма mikopbx.tar.zst не соответствует манифесту"
 
+log "=== сборка vlanit-tui (Cursive) ==="
+bash "$PROJECT_ROOT/scripts/build-tui.sh" 2>&1 | tee "$LOG_DIR/build-tui.log" || \
+    log "предупреждение: vlanit-tui не собран (fallback dialog)"
+
 STEPS=(10-golden-rootfs 20-live-rootfs 30-initramfs 40-staging 50-iso)
 for step in "${STEPS[@]}"; do
     log "=== шаг $step ==="

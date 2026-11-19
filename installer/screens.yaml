@@ -1,0 +1,37 @@
+# Реестр экранов установщика.
+# enabled: false — экран пропускается в навигации (GUI и документация).
+# phase: collect | progress | finish
+# Добавление экрана: запись сюда + handler в gui/server.py (и TUI при необходимости).
+screens:
+  - id: hardware
+    enabled: true
+    phase: collect
+    title: "Проверка оборудования"
+  - id: disk
+    enabled: true
+    phase: collect
+    title: "Выбор диска"
+  - id: network
+    enabled: true
+    phase: collect
+    title: "Настройка сети"
+  - id: system
+    enabled: true
+    phase: collect
+    title: "Система и MikoPBX"
+  - id: wireguard
+    enabled: true
+    phase: collect
+    title: "WireGuard"
+  - id: confirm
+    enabled: true
+    phase: collect
+    title: "Подтверждение"
+  - id: progress
+    enabled: true
+    phase: progress
+    title: "Установка"
+  - id: finish
+    enabled: true
+    phase: finish
+    title: "Установка завершена"

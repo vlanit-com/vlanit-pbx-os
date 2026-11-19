@@ -1,5 +1,5 @@
 [Unit]
-Description=VLANit Installer TUI
+Description=VLANit Installer (HTML GUI / Cursive TUI / dialog)
 After=systemd-user-sessions.service plymouth-quit-wait.service
 After=rc-local.service
 Before=getty@tty1.service
@@ -18,6 +18,8 @@ StandardOutput=tty
 StandardError=tty
 UtmpIdentifier=tty1
 UtmpMode=user
+# GUI/TUI: fb + netsurf; принудительно: vlanit.ui=gui|tui|dialog
+Environment=VLANIT_ALLOW_SDL=0
 
 [Install]
 WantedBy=multi-user.target

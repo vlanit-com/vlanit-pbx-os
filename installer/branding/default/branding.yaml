@@ -1,0 +1,18 @@
+# Профиль брендинга GUI-установщика.
+# Переключение: VLANIT_BRANDING=default (имя каталога в installer/branding/).
+product_name: "VLANit PBX OS"
+installer_heading: "установка"
+logo: logo.png
+colors:
+  bg: "#0a0a0a"
+  card: "#161616"
+  text: "#f2f2f2"
+  muted: "#aaaaaa"
+  accent: "#e6b800"
+  border: "#333333"
+  input_bg: "#222222"
+  input_border: "#555555"
+  button_text: "#111111"
+  error_bg: "#3a1010"
+  error_border: "#cc4444"
+  error_text: "#ffcccc"
