@@ -100,13 +100,18 @@
 - Параллельная работа с другим агентом: фичи вести в отдельной ветке/worktree, не трогать его master и сборку образа.
 - Направление GUI-установщика: HTML (+ FB-браузер) — primary; Cursive TUI — fallback; dialog/whiptail/newt не primary.
 - Правки UI установщика — в реальных исходниках `installer/gui/`, не только в скринах/доках; скрины переснимать после правки.
-- Поля ввода в формах установщика выравнивать на одном уровне; схемы дисков не вставлять между полями так, чтобы ломать колонки.
+- Поля ввода в формах установщика выравнивать на одном уровне и не уводить далеко вправо; схемы дисков не вставлять между полями так, чтобы ломать колонки.
 - После правок установщика, попадающих в ISO: пересобрать ISO и прогнать регресс QEMU; перед этим остановить ненужные VM.
+- Изменения установщика (кроме бампа версии) проводить через OpenSpec.
+- Экраны мастера — через реестр (быстро добавлять/убирать, шаблоны, enable/disable); брендинг — отдельные переключаемые профили.
 
 ## Learned Workspace Facts
 
 - Worktree GUI-установщика: `/home/marvel/projects/_wt/vlanit-pbx-os-gui`, ветка `feature/gui-installer`.
 - Контракт установщика: JSON `/run/vlanit/install-config.json`, `vlanit-probe`, `install-run.sh`; primary — `installer/gui/`, fallback — `installer/tui-cursive/`.
+- Реестр экранов: `installer/screens.yaml`; брендинг-профили: `installer/branding/<profile>/` (переключение `VLANIT_BRANDING`).
+- OpenSpec-изменения установщика: `openspec/changes/` (например `installer-wg-step-form-align`).
 - Сборка TUI: `scripts/build-tui.sh` через Docker-образ `rust:1.85-bookworm` (не раздувает `vlanit-build`); бинарь → `installer/bin/vlanit-tui`.
 - В worktree для `make iso` нужен реальный `build/payload`: symlink на payload основного репо часто не виден в docker-mount.
 - Документация нового UI: `docs/gui-installer.md` + скрины `docs/gui-installer/shots/`; пользовательская установка — `docs/installation.md`.
+- Визуальная проверка Plymouth без железа: QEMU burst screendump (интервал ~0.2–0.5 с, сырые PPM, `virtio-vga`); конфиг-чек ≠ отрисованный splash — `docs/specs/1.3.2-plymouth-verify.md`.
