@@ -31,11 +31,15 @@ TS="$(date +%Y%m%d-%H%M%S)"
 HOST="$(hostname)"
 OUT_TMP="$MNT/.vlanit-backup-$TS.tmp"
 OUT_FINAL="vlanit-backup-$HOST-$TS.tar.zst"
-DATA_MB=$(du -sm /var/spool/mikopbx/cf /var/spool/mikopbx/storage /etc 2>/dev/null | awk '{s+=$1} END{print s+1}')
-FREE_MB=$(df -m --output=avail "$MNT" | tail -1 | tr -d ' ')
+# du может вернуть ≠0 (нет пути на раннем буте / EIO) — при pipefail
+# это молча валило весь скрипт до «остановка MikoPBX». Считаем доступное.
+DATA_MB="$(du -sm /var/spool/mikopbx/cf /var/spool/mikopbx/storage /etc 2>/dev/null | awk '{s+=$1} END{print s+1}')" || true
+DATA_MB="${DATA_MB:-1}"
+FREE_MB="$(df -m --output=avail "$MNT" 2>/dev/null | tail -1 | tr -d '[:space:]')"
+[[ "$FREE_MB" =~ ^[0-9]+$ ]] || die "не удалось определить свободное место на $MNT (df='$FREE_MB')"
 [ "$FREE_MB" -ge "$((DATA_MB + DATA_MB / 10))" ] || \
     die "на носителе мало места: нужно ~${DATA_MB} МБ, свободно $FREE_MB МБ"
-mkdir -p "$OUT_TMP"
+mkdir -p "$OUT_TMP" || die "не удалось создать $OUT_TMP"
 
 # --- 3. бэкап с гарантированным возвратом контейнера ---
 CONTAINER_RESTARTED=0

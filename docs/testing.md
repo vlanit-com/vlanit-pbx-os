@@ -33,6 +33,26 @@ MikoPBX (REBOOT_TEST_PASS).
 
 ## Фактические результаты
 
+### Прогон 2026-11-19, feature/gui-installer 1.4.0 — ВСЁ ЗЕЛЁНОЕ
+
+ISO: `dist/VLANit-PBX-1.4.0-amd64.iso` (892 МиБ). Оркестратор
+`scripts/regress-full.sh` (boot → install → offline → errors → ota →
+backup → mirror). GUI-shots: `docs/gui-installer/shots/` (пересъём
+`scripts/shot-gui-html.sh`).
+
+| Тест | Результат |
+|---|---|
+| Т1 boot | PASS |
+| Т2–Т4/Т6 install | PASS; Т11: install 78s / agent 175s / iso→web 271s (rundir `20261119_090039_3414536`) |
+| Т5 offline | PASS |
+| Т7a–d errors | PASS |
+| Т8 ota | PASS |
+| Т9 backup | PASS |
+| Т-mirror фазы 1–4 | PASS (raid1, ESP-B, degraded B, replace+resync) |
+
+Итого: 21 PASS, 0 FAIL. Unit: `tests/unit/test-config-json.sh` PASS.
+OpenSpec: `installer-wg-step-form-align` validate OK.
+
 ### Прогон 2026-11-17 (ночь), финальное принятие feature/two-disk-mirror — ВСЁ ЗЕЛЁНОЕ
 
 | Тест | Результат |
@@ -216,7 +236,7 @@ symlink + cp resolv.conf, guard `--only-upgrade linux-image-amd64` с
 | Т5 Offline | PASS | полная установка и работа без сетевых устройств |
 | Т6 Btrfs | PASS | subvolumes смонтированы, read-only snapshot создан и отображён |
 | Т7a несуществующий диск | PASS | отказ установщика (диск не в списке кандидатов) |
-| Т7b диск 20 GiB | PASS | отказ (минимум 50 GiB) |
+| Т7b диск 10 GiB | PASS | отказ (Data < DATA_MIN_GIB=8 при pct=25) |
 | Т7c повреждённый payload | PASS | отказ по SHA256 до разметки |
 | Т7d установка без NIC | PASS | установка завершена успешно |
 
@@ -242,6 +262,8 @@ WARN, не FAIL. Спека: `docs/specs/t11-performance-baseline.md`.
 | дата | версия | ISO МиБ | install_sec | agent_sec | iso_to_web_sec | заметка |
 |---|---|---|---|---|---|---|
 | 2026-11-18 | 1.3.1 | 786 | — | — | — | seed: размер dist/VLANit-PBX-1.3.1 до первого T2 на 1.3.2 |
+| 2026-11-18 | 1.3.3 | 892 | 98 | 180 | 296 | T2 QEMU web_ok=1 rundir=20261119_011140_3115370 |
+| 2026-11-19 | 1.4.0 | 892 | 78 | 175 | 271 | T2 QEMU web_ok=1 rundir=20261119_090039_3414536 |
 <!-- T11-BASELINE-END -->
 
 ## Интерактивные проверки 1.3.2 (TUI-мастер, стенд QEMU)
@@ -267,9 +289,28 @@ WARN, не FAIL. Спека: `docs/specs/t11-performance-baseline.md`.
 - plymouth-brand-splash — фирменная заставка на загрузке live и
   установленной системы (факты — verply).
 
+## GUI / Cursive installer 1.4.0 (идея #12)
+
+Одна фича — одна проверка:
+
+- gui-screens-registry — collect-экраны из `installer/screens.yaml`;
+  `enabled: false` пропускает шаг; shots `docs/gui-installer/shots/`.
+- gui-branding-profile — `VLANIT_BRANDING=default` подставляет logo/
+  theme.css; переключение профиля без правки server.py.
+- installer-wg-step — отдельный экран WireGuard (GUI / Cursive / dialog);
+  `wireguard.enabled` в install-config; shots 04-system без WG,
+  05-wireguard.
+- gui-form-align — метки и контролы рядом (`table.form` ~34em);
+  NetSurf без JS.
+- `tests/unit/test-config-json.sh` — round-trip install-config.json
+  (PASS 2026-11-19).
+- Autoinstall QEMU — без UI (регрессия бэкенда).
+- Ручные: GUI на fb0; `vlanit.ui=tui`; `vlanit.ui=dialog`; спайк
+  `scripts/spike-netsurf-fb.sh`. Спека: `docs/specs/gui-installer.md`.
+
 ## Не автоматизируется в v1 (ручные сценарии)
 
-- Интерактивный TUI-мастер (прохождение экранов вручную на железе/ВМ).
+- Интерактивный мастер (GUI / Cursive / dialog) на железе/ВМ.
 - Установка на реальный SATA/NVMe диск (прогон на физическом устройстве).
 - Проверка SIP-регистрации/звонка (требуется SIP-клиент/транк).
 - Загрузка Legacy BIOS (не поддерживается в v1; fallback `EFI/BOOT/BOOTX64.EFI` на целевом ESP добавлен).

@@ -44,11 +44,13 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 `docs/specs/mirror-two-disk.md`, ADR-0004. Проверки: `vlanit-doctor`
 (`lvm-layout`, `lvm-mirror-health`).
 
-**Установщик (1.3.3).** TUI на `dialog` в фирменной теме VLANit
-(`installer/dialogrc`: все ключи явно — чёрный фон, золотые рамки/
-заголовки, выделение чёрный-на-белом; backtitle «VLANit PBX OS
-<версия> — установка»). С 1.3.3 нет утечки defaults Debian в menubox/
-form. Экран установки — gauge со статусами и ETA. Спеки:
+**Установщик (1.4.0).** Primary — HTML + `netsurf-fb` (локальный HTTP);
+реестр экранов `installer/screens.yaml`, брендинг
+`installer/branding/<profile>/` (`VLANIT_BRANDING`). Fallback — Cursive
+TUI (`vlanit-tui`), затем `dialog` в фирменной теме
+(`installer/dialogrc`). Общий бэкенд этапов и autoinstall YAML. Kernel
+cmdline: `vlanit.ui=gui|tui|dialog`. Спеки:
+`docs/specs/gui-installer.md`, галерея `docs/gui-installer.md`,
 `docs/specs/1.3.2-installer-ui.md`, `docs/specs/1.3.3-installer-theme.md`.
 
 **Сеть (nftables, ADR-0003).** Политика `input: default drop`; открыто только
@@ -113,6 +115,8 @@ firstboot-логика осталась идемпотентной подстр�
   `docs/testing.md`, `scripts/perf-baseline.sh`.
   Спека: `docs/specs/testing-roadmap-t10-t17.md`.
 - **Полевой первый бокс (#42)** — чеклист `docs/specs/field-first-box.md`.
+- **GUI-установщик (#12)** — HTML + netsurf-fb, fallback Cursive; ветка
+  `feature/gui-installer`. Полевой спайк fb на ≥2 моделях до GA.
 
 ## Диагностика на устройстве
 
@@ -164,7 +168,7 @@ bash scripts/sign-release.sh   # dist/*.iso.sha256 -> .asc
 # с подписанными контрольными суммами (идея #11, см. ниже «Правило релизов»)
 
 # запись на USB (требует root, ДЕСТРУКТИВНО)
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.3.3-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.0-amd64.iso /dev/sdX
 # другие способы (dd, GNOME Disks, KDE ISO Image Writer, Rufus, balenaEtcher,
 # macOS dd, Ventoy) — docs/installation.md, раздел «Создание загрузочной флэшки»
 
@@ -175,8 +179,8 @@ make clean          # очистка build/{rootfs,live,iso-staging}, dist
 
 | Путь | Назначение |
 |---|---|
-| `dist/VLANit-PBX-1.3.3-amd64.iso` | итоговый загрузочный ISO (UEFI) |
-| `dist/VLANit-PBX-1.3.3-amd64.iso.sha256` | контрольная сумма |
+| `dist/VLANit-PBX-1.4.0-amd64.iso` | итоговый загрузочный ISO (UEFI) |
+| `dist/VLANit-PBX-1.4.0-amd64.iso.sha256` | контрольная сумма |
 | `build/payload/mikopbx-*.tar.zst` | экспортированный образ MikoPBX (+sha256) |
 | `build/payload/golden.tar.zst` | Golden Image устанавливаемой системы |
 | `build/logs/` | журналы шагов сборки |

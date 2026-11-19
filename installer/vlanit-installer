@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# VLANit Installer — TUI установки VLANit PBX OS.
-# Интерактивный режим: dialog. Автоматический: /media/vlanit/autoinstall.yaml.
+# VLANit Installer — entry: autoinstall | HTML GUI | Cursive TUI | dialog.
 set -Eeuo pipefail
 
 export LC_ALL=ru_RU.UTF-8
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for lib in common hardware disk network deploy wireguard progress; do
+export INSTALLER_DIR
+for lib in common hardware disk network deploy wireguard progress config-json install-run ui-select; do
     # shellcheck disable=SC1090
     . "$INSTALLER_DIR/lib/$lib.sh"
 done
 
 ISO_MOUNT="/media/vlanit"
 PAYLOAD="$ISO_MOUNT/payload"
-mkdir -p "$(dirname "$LOG_FILE")"
+mkdir -p "$(dirname "$LOG_FILE")" /run/vlanit
 touch "$LOG_FILE"
 
 [ -d "$PAYLOAD" ] || { echo "payload не найден на $ISO_MOUNT" >&2; exit 1; }
@@ -21,49 +21,26 @@ AUTOMODE=""
 AUTO_FILE="$ISO_MOUNT/autoinstall.yaml"
 if [ -f "$AUTO_FILE" ]; then
     AUTOMODE=1
+    export AUTOMODE
     log "обнаружен autoinstall: $AUTO_FILE"
 fi
 
-# версия для backtitle всех диалогов (единый источник — release-manifest)
 manifest_version="$(yaml_get "$PAYLOAD/release-manifest.yaml" distro.version 1.0)"
 DIALOG_BACKTITLE="VLANit PBX OS $manifest_version — установка"
+export DIALOG_BACKTITLE
 
-# ---------------------------------------------------------------
-# Сбор параметров (интерактивно или из autoinstall.yaml)
-# ---------------------------------------------------------------
 collect_hardware_info
-# Экран 1. Сведения об оборудовании (CPU/RAM/интерфейсы/режим загрузки)
-if [ -z "$AUTOMODE" ]; then
-    hw_text="Процессор: $HW_CPU_MODEL ($HW_CPU_CORES ядер)
-ОЗУ: $HW_RAM_MB МБ
-Сетевые интерфейсы: ${HW_INTERFACES:-нет}
-Режим загрузки: $HW_BOOT_MODE"
-    warn="$(hardware_warnings)"
-    [ -n "$warn" ] && hw_text="$hw_text
 
-ПРЕДУПРЕЖДЕНИЯ:
-$warn"
-    dialog --title "Экран 1. Проверка оборудования" --msgbox "$hw_text" 14 70 \
-        || exit 1
-fi
-if [ "$HW_BOOT_MODE" != "UEFI" ]; then
-    if [ -n "$AUTOMODE" ]; then die "требуется UEFI"; fi
-    dialog --title "Режим загрузки" --msgbox \
-        "Загрузка выполнена не в UEFI-режиме.\nVLANit PBX OS $manifest_version устанавливается только на UEFI.\n\nРежим: $HW_BOOT_MODE" 10 60
-    exit 1
-fi
-
-# --- Диски ---
-mapfile -t DISKS < <(list_candidate_disks)
-[ "${#DISKS[@]}" -gt 0 ] || die "не найдено подходящих внутренних дисков"
-
-TARGET_DISK="" MIRROR_DISK=""
-if [ -n "$AUTOMODE" ]; then
+# ---------- autoinstall: YAML → переменные ----------
+collect_from_autoinstall() {
     TARGET_DISK="$(yaml_get "$AUTO_FILE" disk "")"
     echo "$TARGET_DISK" | grep -q "^/dev/" || die "autoinstall: некорректный диск: $TARGET_DISK"
+    mapfile -t DISKS < <(list_candidate_disks)
+    [ "${#DISKS[@]}" -gt 0 ] || die "не найдено подходящих внутренних дисков"
     known=0
     for d in "${DISKS[@]}"; do [ "${d%%|*}" = "$TARGET_DISK" ] && known=1; done
     [ "$known" -eq 1 ] || die "autoinstall: диск $TARGET_DISK не в списке кандидатов (защита)"
+    MIRROR_DISK=""
     mirror="$(yaml_get "$AUTO_FILE" mirror no | tr 'A-Z' 'a-z')"
     if [ "$mirror" = "yes" ] || [ "$mirror" = "true" ]; then
         MIRROR_DISK="$(yaml_get "$AUTO_FILE" mirror_disk "")"
@@ -80,30 +57,89 @@ if [ -n "$AUTOMODE" ]; then
         disk_is_clean_target "$MIRROR_DISK" || die "autoinstall: на $MIRROR_DISK есть смонтированные разделы"
     fi
     disk_is_clean_target "$TARGET_DISK" || die "autoinstall: на $TARGET_DISK есть смонтированные разделы"
-    # минимум диска — из конфигурации, без магических чисел: usable
-    # (диск − ESP − запас) должен вместить root (system_size_pct) и
-    # Data ≥ DATA_MIN_GIB. Переопределение процента можно задать в
-    # autoinstall.yaml (стенд mirror использует для малого профиля).
     SYS_SIZE_PCT_OVERRIDE="$(yaml_get "$AUTO_FILE" system_size_pct "")"
     export SYS_SIZE_PCT_OVERRIDE
-    for d in "$TARGET_DISK" $MIRROR_DISK; do
-        size_bytes="$(disk_size_bytes "$d")"
-        usable="$(usable_mib "$size_bytes")"
-        sys_mib="$(installer_root_mib "$usable")"
-        data_mib=$(( usable - sys_mib ))
-        min_data_mib=$(( DATA_MIN_GIB * 1024 ))
-        [ "$data_mib" -ge "$min_data_mib" ] || \
-            die "autoinstall: диск $(human_gb "$size_bytes") GiB слишком мал (нужно Data ≥ $DATA_MIN_GIB ГиБ: root $sys_mib МиБ + Data $DATA_MIN_GIB ГиБ + ESP 1 ГиБ)"
-    done
-else
-    menu_items=()
-    i=1
+
+    NET_IFACE="$(yaml_get "$AUTO_FILE" network.interface "")"
+    [ -z "$NET_IFACE" ] && NET_IFACE="$(list_interfaces | head -1)"
+    NET_MODE="$(yaml_get "$AUTO_FILE" network.mode dhcp)"
+    NET_ADDR="$(yaml_get "$AUTO_FILE" network.address "")"
+    NET_GW="$(yaml_get "$AUTO_FILE" network.gateway "")"
+    NET_DNS="$(yaml_get "$AUTO_FILE" network.dns "9.9.9.9")"
+
+    SYS_HOSTNAME="$(yaml_get "$AUTO_FILE" hostname vlanit-pbx)"
+    ADMIN_USER="$(yaml_get "$AUTO_FILE" admin.user vlanit)"
+    ADMIN_PASS="$(yaml_get "$AUTO_FILE" admin.password "")"
+    SSH_ENABLED="$(yaml_get "$AUTO_FILE" ssh.enabled yes | tr 'A-Z' 'a-z')"
+    case "$SSH_ENABLED" in yes|true) SSH_ENABLED="yes" ;; *) SSH_ENABLED="no" ;; esac
+    TZ_NAME="$(yaml_get "$AUTO_FILE" timezone UTC)"
+    [ -n "$ADMIN_PASS" ] || die "autoinstall: задайте admin.password"
+
+    WG_ENABLED="$(yaml_get "$AUTO_FILE" wireguard.enabled no | tr 'A-Z' 'a-z')"
+    WG_ADDR="$(yaml_get "$AUTO_FILE" wireguard.address 10.66.66.1/24)"
+    WG_PORT="$(yaml_get "$AUTO_FILE" wireguard.listen_port 51820)"
+    WG_PEERS_FILE=""
+    if [ "$WG_ENABLED" = "yes" ] || [ "$WG_ENABLED" = "true" ]; then
+        WG_ENABLED="yes"
+        WG_PEERS_FILE="$(mktemp)"
+        python3 - "$AUTO_FILE" > "$WG_PEERS_FILE" <<'PYEOF'
+import sys, yaml
+data = yaml.safe_load(open(sys.argv[1])) or {}
+for peer in (data.get("wireguard", {}).get("peers") or []):
+    pk = peer.get("public_key", "").strip()
+    ips = peer.get("allowed_ips", "").strip()
+    if pk:
+        print("[Peer]")
+        print(f"PublicKey = {pk}")
+        if ips:
+            print(f"AllowedIPs = {ips}")
+        print()
+PYEOF
+    fi
+
+    PBX_NAME="$(yaml_get "$AUTO_FILE" mikopbx.name VLANit-PBX)"
+    PBX_ADMIN_LOGIN="$(yaml_get "$AUTO_FILE" mikopbx.web_admin_login admin)"
+    PBX_ADMIN_PASS="$(yaml_get "$AUTO_FILE" mikopbx.web_admin_password "")"
+    KERNEL_ARGS="$(yaml_get "$AUTO_FILE" kernel_args "")"
+
+    confirm="$(yaml_get "$AUTO_FILE" confirm "")"
+    case "$confirm" in yes|Yes|YES|true|True|TRUE) : ;; *) die "autoinstall: confirm: yes обязателен" ;; esac
+    log "автоподтверждение (autoinstall)"
+
+    export TARGET_DISK MIRROR_DISK NET_IFACE NET_MODE NET_ADDR NET_GW NET_DNS
+    export SYS_HOSTNAME ADMIN_USER ADMIN_PASS SSH_ENABLED TZ_NAME
+    export WG_ENABLED WG_ADDR WG_PORT WG_PEERS_FILE
+    export PBX_NAME PBX_ADMIN_LOGIN PBX_ADMIN_PASS KERNEL_ARGS
+}
+
+# ---------- dialog fallback (переходный) ----------
+collect_from_dialog() {
+    if [ "$HW_BOOT_MODE" != "UEFI" ]; then
+        dialog --title "Режим загрузки" --msgbox \
+            "Загрузка выполнена не в UEFI-режиме.\nVLANit PBX OS $manifest_version устанавливается только на UEFI.\n\nРежим: $HW_BOOT_MODE" 10 60
+        exit 1
+    fi
+    hw_text="Процессор: $HW_CPU_MODEL ($HW_CPU_CORES ядер)
+ОЗУ: $HW_RAM_MB МБ
+Сетевые интерфейсы: ${HW_INTERFACES:-нет}
+Режим загрузки: $HW_BOOT_MODE"
+    warn="$(hardware_warnings)"
+    [ -n "$warn" ] && hw_text="$hw_text
+
+ПРЕДУПРЕЖДЕНИЯ:
+$warn"
+    dialog --title "Экран 1. Проверка оборудования" --msgbox "$hw_text" 14 70 || exit 1
+
+    mapfile -t DISKS < <(list_candidate_disks)
+    [ "${#DISKS[@]}" -gt 0 ] || die "не найдено подходящих внутренних дисков"
+    menu_items=(); i=1
     for d in "${DISKS[@]}"; do
         IFS='|' read -r dev size tran model <<< "$d"
         menu_items+=("$i" "$dev  $(human_gb "$size") GiB  ${model:-unknown}  [${tran:-sata}]")
         eval "DISK_$i='$dev'"
         i=$((i+1))
     done
+    TARGET_DISK="" MIRROR_DISK=""
     while true; do
         choice="$(dialog --title "Экран 2. Выбор диска" --menu \
             "ВНИМАНИЕ: выбранный диск будет полностью очищен.\n\nДоступные накопители:" \
@@ -116,7 +152,6 @@ else
         [ "$size_bytes" -lt "$warn_bytes" ] && msg="$msg\n\nПРЕДУПРЕЖДЕНИЕ: диск меньше $warn_gb GiB."
         dialog --title "Подтверждение диска" --yesno "$msg\n\nПродолжить?" 12 70 && break
     done
-    # Второй диск: зеркало RAID1. Режим спрашиваем только при ≥2 кандидатах.
     if [ "${#DISKS[@]}" -ge 2 ]; then
         c="$(dialog --title "Режим дисков" --menu \
             "Обнаружено несколько накопителей. Режим установки:" 11 70 4 \
@@ -148,19 +183,8 @@ else
             dialog --title "Подтверждение зеркала" --yesno "$msg\n\nПродолжить?" 13 70 || exit 1
         fi
     fi
-fi
-log "целевой диск: $TARGET_DISK${MIRROR_DISK:+, зеркало: $MIRROR_DISK}"
 
-# --- Сеть ---
-NET_IFACE="" NET_MODE="dhcp" NET_ADDR="" NET_GW="" NET_DNS="9.9.9.9"
-if [ -n "$AUTOMODE" ]; then
-    NET_IFACE="$(yaml_get "$AUTO_FILE" network.interface "")"
-    [ -z "$NET_IFACE" ] && NET_IFACE="$(list_interfaces | head -1)"
-    NET_MODE="$(yaml_get "$AUTO_FILE" network.mode dhcp)"
-    NET_ADDR="$(yaml_get "$AUTO_FILE" network.address "")"
-    NET_GW="$(yaml_get "$AUTO_FILE" network.gateway "")"
-    NET_DNS="$(yaml_get "$AUTO_FILE" network.dns "9.9.9.9")"
-else
+    NET_IFACE="" NET_MODE="dhcp" NET_ADDR="" NET_GW="" NET_DNS="9.9.9.9"
     ifaces=(); i=1
     for f in $(list_interfaces); do
         mac="$(iface_mac "$f")"
@@ -180,45 +204,11 @@ else
         NET_GW="$(dialog --title "Шлюз" --inputbox "Адрес шлюза:" 8 60 --stdout)" || exit 1
         NET_DNS="$(dialog --title "DNS" --inputbox "DNS-серверы (через пробел):" 8 60 "9.9.9.9" --stdout)" || exit 1
     fi
-fi
-log "сеть: $NET_IFACE, режим $NET_MODE"
-apply_live_network "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
 
-# --- Системные параметры ---
-SYS_HOSTNAME="vlanit-pbx" ADMIN_USER="vlanit" ADMIN_PASS="" SSH_ENABLED="yes" TZ_NAME="UTC"
-WG_ENABLED="no" WG_ADDR="10.66.66.1/24" WG_PORT="51820" WG_PEERS_FILE=""
-if [ -n "$AUTOMODE" ]; then
-    SYS_HOSTNAME="$(yaml_get "$AUTO_FILE" hostname vlanit-pbx)"
-    ADMIN_USER="$(yaml_get "$AUTO_FILE" admin.user vlanit)"
-    ADMIN_PASS="$(yaml_get "$AUTO_FILE" admin.password "")"
-    SSH_ENABLED="$(yaml_get "$AUTO_FILE" ssh.enabled yes | tr 'A-Z' 'a-z')"
-    case "$SSH_ENABLED" in yes|true) SSH_ENABLED="yes" ;; *) SSH_ENABLED="no" ;; esac
-    TZ_NAME="$(yaml_get "$AUTO_FILE" timezone UTC)"
-    [ -n "$ADMIN_PASS" ] || die "autoinstall: задайте admin.password"
-    WG_ENABLED="$(yaml_get "$AUTO_FILE" wireguard.enabled no | tr 'A-Z' 'a-z')"
-    WG_ADDR="$(yaml_get "$AUTO_FILE" wireguard.address 10.66.66.1/24)"
-    WG_PORT="$(yaml_get "$AUTO_FILE" wireguard.listen_port 51820)"
-    if [ "$WG_ENABLED" = "yes" ] || [ "$WG_ENABLED" = "true" ]; then
-        WG_ENABLED="yes"        # peers: список {public_key, allowed_ips} → [Peer]-блоки
-        WG_PEERS_FILE="$(mktemp)"
-        python3 - "$AUTO_FILE" > "$WG_PEERS_FILE" <<'PYEOF'
-import sys, yaml
-data = yaml.safe_load(open(sys.argv[1])) or {}
-for peer in (data.get("wireguard", {}).get("peers") or []):
-    pk = peer.get("public_key", "").strip()
-    ips = peer.get("allowed_ips", "").strip()
-    if pk:
-        print("[Peer]")
-        print(f"PublicKey = {pk}")
-        if ips:
-            print(f"AllowedIPs = {ips}")
-        print()
-PYEOF
-    fi
-else
+    SYS_HOSTNAME="vlanit-pbx" ADMIN_USER="vlanit" ADMIN_PASS="" SSH_ENABLED="yes" TZ_NAME="Europe/Moscow"
+    WG_ENABLED="no" WG_ADDR="10.66.66.1/24" WG_PORT="51820" WG_PEERS_FILE=""
     SYS_HOSTNAME="$(dialog --title "Экран 4. Параметры системы" --inputbox "Hostname:" 8 60 "vlanit-pbx" --stdout)" || exit 1
     ADMIN_USER="$(dialog --title "Локальный администратор" --inputbox "Имя пользователя:" 8 60 "vlanit" --stdout)" || exit 1
-    # короткий/невалидный пароль: msgbox и повторный ввод, а не обрыв (issue #44)
     while :; do
         ADMIN_PASS="$(dialog --title "Пароль администратора" --passwordbox "Пароль (мин. 8 символов, не используйте стандартные пароли):" 8 60 --stdout)" || exit 1
         [ "${#ADMIN_PASS}" -ge 8 ] && break
@@ -226,53 +216,38 @@ else
     done
     c="$(dialog --title "SSH" --menu "SSH-сервер:" 9 60 3 1 "Включить" 2 "Отключить" --stdout)" || exit 1
     [ "$c" = "2" ] && SSH_ENABLED="no"
-    # невалидный пояс: msgbox и повторный ввод, а не обрыв (issue #44)
     while :; do
         TZ_NAME="$(dialog --title "Часовой пояс" --inputbox "Часовой пояс (IANA, напр. Europe/Moscow):" 8 60 "Europe/Moscow" --stdout)" || exit 1
         [ -f "/usr/share/zoneinfo/$TZ_NAME" ] && break
         dialog --msgbox "Неизвестный часовой пояс: $TZ_NAME" 7 60
     done
-    c="$(dialog --title "WireGuard VPN" --menu "Настроить WireGuard (своя пара ключей, автозапуск):" \
-        9 64 3 1 "Да, включить" 2 "Нет" --stdout)" || exit 1
+
+    PBX_NAME="VLANit-PBX" PBX_ADMIN_LOGIN="admin" PBX_ADMIN_PASS=""
+    PBX_NAME="$(dialog --title "MikoPBX" --inputbox "Имя АТС (PBX_NAME):" 8 60 "VLANit-PBX" --stdout)" || exit 1
+    PBX_ADMIN_PASS="$(dialog --title "MikoPBX" --passwordbox "Пароль веб-админа MikoPBX (пусто = будет сгенерирован и показан):" 8 60 --stdout)" || exit 1
+
+    # Экран 5. WireGuard — отдельный шаг (вкл после установки или нет)
+    c="$(dialog --title "Экран 5. WireGuard" --menu "Включить WireGuard после установки?" \
+        10 64 3 1 "Включить после установки" 2 "Не включать" --stdout)" || exit 1
     if [ "$c" = "1" ]; then
         WG_ENABLED="yes"
         WG_ADDR="$(dialog --title "WireGuard" --inputbox "Адрес интерфейса wg0 (CIDR):" \
             8 60 "10.66.66.1/24" --stdout)" || exit 1
+        WG_PORT="$(dialog --title "WireGuard" --inputbox "Listen port:" \
+            8 60 "51820" --stdout)" || exit 1
+        case "$WG_PORT" in
+            ''|*[!0-9]*) dialog --msgbox "Порт WireGuard — целое число." 7 50; exit 1 ;;
+        esac
+    else
+        WG_ENABLED="no"
     fi
-fi
 
-# --- MikoPBX ---
-PBX_NAME="VLANit-PBX" PBX_ADMIN_LOGIN="admin" PBX_ADMIN_PASS=""
-if [ -n "$AUTOMODE" ]; then
-    PBX_NAME="$(yaml_get "$AUTO_FILE" mikopbx.name VLANit-PBX)"
-    PBX_ADMIN_LOGIN="$(yaml_get "$AUTO_FILE" mikopbx.web_admin_login admin)"
-    PBX_ADMIN_PASS="$(yaml_get "$AUTO_FILE" mikopbx.web_admin_password "")"
-else
-    PBX_NAME="$(dialog --title "MikoPBX" --inputbox "Имя АТС (PBX_NAME):" 8 60 "VLANit-PBX" --stdout)" || exit 1
-    PBX_ADMIN_PASS="$(dialog --title "MikoPBX" --passwordbox "Пароль веб-админа MikoPBX (пусто = будет сгенерирован и показан):" 8 60 --stdout)" || exit 1
-fi
-# пустой пароль недопустим: генерируем и показываем на экране завершения
-PBX_PASS_GENERATED=0
-if [ -z "$PBX_ADMIN_PASS" ]; then
-    PBX_ADMIN_PASS="$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | head -c 16)"
-    PBX_PASS_GENERATED=1
-fi
-
-# ---------------------------------------------------------------
-# Экран 5. Подтверждение
-# ---------------------------------------------------------------
-if [ -n "$AUTOMODE" ]; then
-    confirm="$(yaml_get "$AUTO_FILE" confirm "")"
-    case "$confirm" in
-        yes|Yes|YES|true|True|TRUE) : ;;
-        *) die "autoinstall: confirm: yes обязателен" ;;
-    esac
-    log "автоподтверждение (autoinstall)"
-else
     warn="$(hardware_warnings)"
     mirror_line=""
     [ -n "$MIRROR_DISK" ] && mirror_line="
 Зеркало: RAID1 ($TARGET_DISK + $MIRROR_DISK)"
+    wg_line="выкл"
+    [ "$WG_ENABLED" = "yes" ] && wg_line="вкл ($WG_ADDR, порт $WG_PORT)"
     summary="Целевой диск: $TARGET_DISK$mirror_line
 Режим сети: $NET_MODE (интерфейс $NET_IFACE)
 Hostname: $SYS_HOSTNAME
@@ -280,123 +255,76 @@ Hostname: $SYS_HOSTNAME
 Админ: $ADMIN_USER
 SSH: $SSH_ENABLED
 Имя АТС: $PBX_NAME
+WireGuard: $wg_line
 Версия системы: VLANit PBX OS $manifest_version
 
 ВСЕ ДАННЫЕ НА ДИСКЕ БУДУТ УДАЛЕНЫ."
     [ -n "$warn" ] && summary="$warn
 $summary"
-    dialog --title "Экран 5. Подтверждение установки" --yesno "$summary\n\nНачать установку?" 18 72 || exit 1
-fi
+    dialog --title "Экран 6. Подтверждение установки" --yesno "$summary\n\nНачать установку?" 20 72 || exit 1
 
-# ---------------------------------------------------------------
-# Экран 6. Установка (этапы с прогрессом)
-# ---------------------------------------------------------------
-log "=== начало установки на $TARGET_DISK ==="
+    KERNEL_ARGS=""
+    export TARGET_DISK MIRROR_DISK NET_IFACE NET_MODE NET_ADDR NET_GW NET_DNS
+    export SYS_HOSTNAME ADMIN_USER ADMIN_PASS SSH_ENABLED TZ_NAME
+    export WG_ENABLED WG_ADDR WG_PORT WG_PEERS_FILE
+    export PBX_NAME PBX_ADMIN_LOGIN PBX_ADMIN_PASS KERNEL_ARGS
+}
 
-KERNEL_ARGS=""
+# ---------- сбор параметров ----------
+UI_MODE="autoinstall"
 if [ -n "$AUTOMODE" ]; then
-    KERNEL_ARGS="$(yaml_get "$AUTO_FILE" kernel_args "")"
-    echo "VLANit Installer — журнал: $LOG_FILE"
+    collect_from_autoinstall
 else
-    progress_begin "Установка VLANit PBX OS"
+    set +e
+    ui_collect_config
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
+        UI_MODE="json"
+        : "${UI_FRONTEND:=gui}"
+        config_json_load /run/vlanit/install-config.json
+        WG_PEERS_FILE=""
+        export WG_PEERS_FILE
+    elif [ "$rc" -eq 2 ]; then
+        UI_MODE="dialog"
+        UI_FRONTEND=dialog
+        collect_from_dialog
+    else
+        die "не удалось собрать параметры установки (UI)"
+    fi
 fi
+export UI_FRONTEND="${UI_FRONTEND:-dialog}"
 
-# --- этапы (обёртки с фиксированной сигнатурой для run_stage) ---
-verify_payload() {
-    ( cd "$PAYLOAD" && sha256sum -c golden.tar.zst.sha256 ) || \
-        die "контрольная сумма golden.tar.zst не соответствует манифесту"
-    ( cd "$PAYLOAD" && sha256sum -c mikopbx-2026.6.99-amd64.tar.zst.sha256 ) || \
-        die "контрольная сумма mikopbx.tar.zst не соответствует манифесту"
-    log "payload корректен"
-}
-stage_partitions() {
-    partition_disk "$TARGET_DISK"
-    [ -z "$MIRROR_DISK" ] || partition_disk "$MIRROR_DISK"
-}
-stage_deploy() { deploy_golden "$TARGET_DISK"; }
-stage_mikopbx_env() { configure_target_mikopbx "$PBX_NAME" "$PBX_ADMIN_LOGIN" "$PBX_ADMIN_PASS" "$TZ_NAME"; }
+log "целевой диск: $TARGET_DISK${MIRROR_DISK:+, зеркало: $MIRROR_DISK}"
+log "сеть: $NET_IFACE, режим $NET_MODE (UI=$UI_MODE)"
+apply_live_network "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
 
-# Верификация payload — до любых деструктивных операций
-run_stage 3 "Проверка контрольных сумм" verify_payload
-run_stage 8 "Разметка дисков" stage_partitions
-run_stage 13 "Хранилище (LVM, Btrfs)" create_storage "$TARGET_DISK" $MIRROR_DISK
-run_stage 60 "Развёртывание системы" stage_deploy
-
-run_stage 65 "Конфигурация системы" \
-    configure_target_system "$SYS_HOSTNAME" "$ADMIN_USER" "$ADMIN_PASS" "$SSH_ENABLED" "$TZ_NAME" "$KERNEL_ARGS"
-run_stage 68 "Настройка сети" \
-    write_target_network "$SYS_MNT" "$NET_IFACE" "$NET_MODE" "$NET_ADDR" "$NET_GW" "$NET_DNS"
-if [ "$WG_ENABLED" = "yes" ]; then
-    run_stage 70 "Настройка WireGuard" configure_target_wireguard "$WG_ADDR" "$WG_PORT" "$WG_PEERS_FILE"
+install_ensure_pbx_password
+install_validate_preflight
+case "$UI_MODE" in
+    json) export PROGRESS_UI=json ;;
+    autoinstall) export PROGRESS_UI=none ;;
+    *) export PROGRESS_UI=dialog ;;
+esac
+# GUI: поднять progress-сервер + netsurf на время stages
+GUI_PROG_PIDS=()
+if [ "${UI_FRONTEND:-}" = "gui" ]; then
+    rm -f /run/vlanit/gui-done
+    printf '{"percent":0,"text":"Подготовка..."}\n' > /run/vlanit/progress.json
+    VLANIT_GUI_MODE=progress python3 "$INSTALLER_DIR/gui/server.py" &
+    GUI_PROG_PIDS+=($!)
+    if [ -c /dev/fb0 ]; then
+        netsurf-fb -f linux "http://127.0.0.1:${VLANIT_GUI_PORT:-8765}/" &
+    else
+        netsurf-fb -f sdl -w 1024 -h 768 "http://127.0.0.1:${VLANIT_GUI_PORT:-8765}/" &
+    fi
+    GUI_PROG_PIDS+=($!)
 fi
-run_stage 72 "Настройка MikoPBX" stage_mikopbx_env
-run_stage 85 "Импорт образа MikoPBX" import_mikopbx_image
+install_run_stages
+for p in "${GUI_PROG_PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done
 
-run_stage 95 "Загрузчик (initramfs, GRUB)" install_bootloader $MIRROR_DISK
-
-# базовый snapshot после установки (по метке — LV, а не раздел)
-stage_finalize() {
-    post_install_report "$TARGET_DISK"
-    mount -o subvolid=5 LABEL=vlanit-system /mnt 2>/dev/null && {
-        btrfs subvolume snapshot -r /mnt/@ /mnt/@snapshots/post-install-@ 2>/dev/null || true
-        umount /mnt
-    } || true
-}
-run_stage 98 "Финальные операции" stage_finalize
-
-WG_PUBKEY=""
-[ "$WG_ENABLED" = "yes" ] && WG_PUBKEY="$(wireguard_pubkey)"
-unmount_target
-
-if [ -z "$AUTOMODE" ]; then
-    progress_end
-else
-    log "=== установка завершена ==="
-fi
-
-# ---------------------------------------------------------------
-# Экран 7. Завершение
-# ---------------------------------------------------------------
-IP_ADDR=""
-for _ in $(seq 1 15); do
-    IP_ADDR="$(ip -4 -o addr show dev "$NET_IFACE" | awk '{print $4}' | cut -d/ -f1 | head -1)"
-    [ -n "$IP_ADDR" ] && break
-    sleep 1
-done
-[ -n "$IP_ADDR" ] || IP_ADDR="<адрес будет назначен при загрузке>"
-
-podman_v="$(yaml_get "$PAYLOAD/release-manifest.yaml" podman "")"
-[ -n "$podman_v" ] || podman_v="(в образе)"
-finish_text="VLANit PBX OS $manifest_version
-Debian: $(yaml_get "$PAYLOAD/release-manifest.yaml" debian.version 13)
-Podman: $podman_v
-MikoPBX: 2026.6.99
-Hostname: $SYS_HOSTNAME
-IP-адрес: $IP_ADDR
-Статус MikoPBX: будет запущена автоматически при первой загрузке
-Веб-интерфейс: https://$IP_ADDR (логин: $PBX_ADMIN_LOGIN)"
-
-if [ -n "$MIRROR_DISK" ]; then
-    finish_text="$finish_text
-Зеркало дисков: RAID1 активно ($TARGET_DISK + $MIRROR_DISK)"
-fi
-
-if [ "$PBX_PASS_GENERATED" = "1" ]; then
-    finish_text="$finish_text
-Пароль веб-админа сгенерирован автоматически, сохраните:
-$PBX_ADMIN_PASS"
-fi
-
-if [ -n "$WG_PUBKEY" ]; then
-    finish_text="$finish_text
-WireGuard: включён ($WG_ADDR, порт $WG_PORT)
-Публичный ключ устройства (добавьте на пир):
-$WG_PUBKEY"
-fi
-
-finish_text="$finish_text
-
-Извлеките установочный USB и перезагрузите устройство."
+finish_text="$(install_finish_text)"
+printf '%s\n' "$finish_text" > /run/vlanit/finish.txt
 
 if [ -n "$AUTOMODE" ]; then
     echo "$finish_text"
@@ -405,9 +333,32 @@ if [ -n "$AUTOMODE" ]; then
     sync
     sleep 2
     reboot -f
-else
-    dialog --title "Экран 7. Установка завершена" --msgbox "$finish_text" 16 72 || true
-    if dialog --title "Перезагрузка" --yesno "Перезагрузить устройство сейчас?" 7 50; then
-        sync; reboot -f
+fi
+
+# HTML finish, если primary был GUI
+if [ "${UI_FRONTEND:-}" = "gui" ]; then
+    export VLANIT_GUI_MODE=finish
+    python3 "$INSTALLER_DIR/gui/server.py" &
+    FIN_PID=$!
+    sleep 0.3
+    if [ -c /dev/fb0 ]; then
+        netsurf-fb -f linux "http://127.0.0.1:${VLANIT_GUI_PORT:-8765}/" &
+    else
+        netsurf-fb -f sdl -w 1024 -h 768 "http://127.0.0.1:${VLANIT_GUI_PORT:-8765}/" &
     fi
+    NS_PID=$!
+    for _ in $(seq 1 600); do
+        if [ -f /run/vlanit/gui-done ] && grep -q reboot /run/vlanit/gui-done 2>/dev/null; then
+            break
+        fi
+        kill -0 "$NS_PID" 2>/dev/null || break
+        sleep 1
+    done
+    kill "$NS_PID" "$FIN_PID" 2>/dev/null || true
+    sync; reboot -f
+fi
+
+dialog --title "Экран 7. Установка завершена" --msgbox "$finish_text" 16 72 || true
+if dialog --title "Перезагрузка" --yesno "Перезагрузить устройство сейчас?" 7 50; then
+    sync; reboot -f
 fi

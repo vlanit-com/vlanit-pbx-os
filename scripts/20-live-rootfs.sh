@@ -16,6 +16,8 @@ LIVE_PACKAGES="
 systemd-sysv dbus udev
 linux-image-amd64 initramfs-tools busybox-static
 dialog locales ncurses-term
+netsurf-fb netsurf-common
+fonts-dejavu-core
 gdisk parted
 console-setup
 btrfs-progs dosfstools e2fsprogs lvm2
@@ -83,12 +85,27 @@ LANG=ru_RU.UTF-8
 LANGUAGE=ru_RU:en_US
 EOF
 
+# PNG схем/лого для HTML-UI (если есть cairosvg в build-контейнере)
+if command -v python3 >/dev/null && [ -f "$PROJECT_ROOT/scripts/render-gui-assets.py" ]; then
+    python3 "$PROJECT_ROOT/scripts/render-gui-assets.py" || true
+fi
+
 log "установка VLANit Installer и provisioning"
 install -d -m 0755 "$ROOTFS/opt/vlanit"
 cp -a "$PROJECT_ROOT/installer/." "$ROOTFS/opt/vlanit/installer/"
+# исходники Rust/target не нужны в live
+rm -rf "$ROOTFS/opt/vlanit/installer/tui-cursive/target"
 cp -a "$PROJECT_ROOT/provisioning/." "$ROOTFS/opt/vlanit/provisioning/"
+# branding для GUI (логотип)
+install -d -m 0755 "$ROOTFS/usr/share/vlanit/branding"
+install -m 0644 "$PROJECT_ROOT/branding/vlanit-logo-on-dark.svg" \
+    "$ROOTFS/usr/share/vlanit/branding/vlanit-logo-on-dark.svg"
 # владение — строго root (cp -a сохраняет uid сборочной машины; полевой дефект 1.2.4)
-chown -R root:root "$ROOTFS/opt/vlanit"
+chown -R root:root "$ROOTFS/opt/vlanit" "$ROOTFS/usr/share/vlanit"
+chmod 0755 "$ROOTFS/opt/vlanit/installer/vlanit-installer"
+chmod 0755 "$ROOTFS/opt/vlanit/installer/bin/"* 2>/dev/null || true
+chmod 0755 "$ROOTFS/opt/vlanit/installer/gui/"*.sh 2>/dev/null || true
+chmod 0755 "$ROOTFS/opt/vlanit/installer/gui/server.py"
 install -D -m 0755 "$PROJECT_ROOT/live/vlanit-init" "$ROOTFS/opt/vlanit/vlanit-init"
 install -D -m 0755 "$PROJECT_ROOT/live/initramfs-hook-vlanit-live" \
     "$ROOTFS/etc/initramfs-tools/hooks/vlanit-live"

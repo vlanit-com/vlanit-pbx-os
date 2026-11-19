@@ -18,12 +18,15 @@ log "ядро: $KERNEL_VERSION"
 install -D -m 0755 "$PROJECT_ROOT/live/vlanit-init" "$ROOTFS/opt/vlanit/vlanit-init"
 install -D -m 0755 "$PROJECT_ROOT/live/initramfs-hook-vlanit-live" \
     "$ROOTFS/etc/initramfs-tools/hooks/vlanit-live"
-install -D -m 0755 "$PROJECT_ROOT/installer/vlanit-installer" \
-    "$ROOTFS/opt/vlanit/installer/vlanit-installer"
-for lib in common hardware disk network deploy; do
-    install -D -m 0644 "$PROJECT_ROOT/installer/lib/$lib.sh" \
-        "$ROOTFS/opt/vlanit/installer/lib/$lib.sh"
-done
+# полная синхронизация installer (GUI/Cursive/libs) — cp, не частичный список
+rm -rf "$ROOTFS/opt/vlanit/installer"
+cp -a "$PROJECT_ROOT/installer/." "$ROOTFS/opt/vlanit/installer/"
+rm -rf "$ROOTFS/opt/vlanit/installer/tui-cursive/target"
+chown -R root:root "$ROOTFS/opt/vlanit/installer"
+chmod 0755 "$ROOTFS/opt/vlanit/installer/vlanit-installer"
+chmod 0755 "$ROOTFS/opt/vlanit/installer/bin/"* 2>/dev/null || true
+chmod 0755 "$ROOTFS/opt/vlanit/installer/gui/"*.sh 2>/dev/null || true
+chmod 0755 "$ROOTFS/opt/vlanit/installer/gui/server.py"
 
 log "сборка initramfs (chroot live rootfs)"
 chroot "$ROOTFS" sh -c "

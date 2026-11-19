@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# vlanit-probe — JSON-снимки для HTML/Cursive UI (без dialog).
+# Usage: vlanit-probe hardware|disks|ifaces|version
+set -Eeuo pipefail
+
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+. "$INSTALLER_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+. "$INSTALLER_DIR/lib/hardware.sh"
+# shellcheck disable=SC1091
+. "$INSTALLER_DIR/lib/disk.sh"
+# shellcheck disable=SC1091
+. "$INSTALLER_DIR/lib/network.sh"
+
+PAYLOAD="${PAYLOAD:-/media/vlanit/payload}"
+
+cmd="${1:-}"
+case "$cmd" in
+hardware)
+    collect_hardware_info
+    export HW_CPU_MODEL HW_CPU_CORES HW_RAM_MB HW_BOOT_MODE HW_INTERFACES
+    HW_WARNINGS="$(hardware_warnings | tr '\n' ' ')"
+    export HW_WARNINGS
+    python3 - <<'PY'
+import json, os
+print(json.dumps({
+    "cpu": os.environ.get("HW_CPU_MODEL", ""),
+    "cores": int(os.environ.get("HW_CPU_CORES") or 0),
+    "ram_mb": int(os.environ.get("HW_RAM_MB") or 0),
+    "boot_mode": os.environ.get("HW_BOOT_MODE", ""),
+    "interfaces": (os.environ.get("HW_INTERFACES") or "").split(),
+    "warnings": (os.environ.get("HW_WARNINGS") or "").strip(),
+}, ensure_ascii=False))
+PY
+    ;;
+disks)
+    mapfile -t DISKS < <(list_candidate_disks)
+    export PAYLOAD
+    DISKS_RAW="$(printf '%s\n' "${DISKS[@]}")"
+    export DISKS_RAW
+    python3 - <<'PY'
+import json, os
+payload = os.environ.get("PAYLOAD", "/media/vlanit/payload")
+disks = []
+for entry in (os.environ.get("DISKS_RAW") or "").splitlines():
+    if not entry.strip():
+        continue
+    parts = entry.split("|", 3)
+    if len(parts) < 2:
+        continue
+    dev, size = parts[0], parts[1]
+    tran = parts[2] if len(parts) > 2 else ""
+    model = parts[3] if len(parts) > 3 else ""
+    try:
+        size_i = int(size)
+        gb = round(size_i / (1024**3), 1)
+    except Exception:
+        size_i, gb = 0, 0.0
+    disks.append({
+        "dev": dev,
+        "size_bytes": size_i,
+        "size_gib": gb,
+        "tran": tran,
+        "model": model or "unknown",
+    })
+warn_gb = 64
+try:
+    import yaml
+    with open(os.path.join(payload, "build.yaml"), encoding="utf-8") as f:
+        warn_gb = int((yaml.safe_load(f) or {}).get("installer", {}).get("warn_disk_gb", 64))
+except Exception:
+    pass
+print(json.dumps({"disks": disks, "warn_disk_gb": warn_gb}, ensure_ascii=False))
+PY
+    ;;
+ifaces)
+    {
+        for f in $(list_interfaces); do
+            printf '%s|%s\n' "$f" "$(iface_mac "$f")"
+        done
+    } | python3 - <<'PY'
+import json, sys
+out = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    name, mac = line.split("|", 1)
+    out.append({"name": name, "mac": mac})
+print(json.dumps({"interfaces": out}, ensure_ascii=False))
+PY
+    ;;
+version)
+    ver="$(yaml_get "$PAYLOAD/release-manifest.yaml" distro.version 1.0 2>/dev/null || echo 1.0)"
+    export ver
+    python3 -c 'import json,os; print(json.dumps({"version": os.environ["ver"]}))'
+    ;;
+*)
+    echo "usage: vlanit-probe hardware|disks|ifaces|version" >&2
+    exit 2
+    ;;
+esac

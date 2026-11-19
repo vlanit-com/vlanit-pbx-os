@@ -1,0 +1,15 @@
+/* Цвета профиля — переопределяют :root из branding.yaml (дубль для ручного CSS). */
+:root {
+  --vlanit-bg: #0a0a0a;
+  --vlanit-card: #161616;
+  --vlanit-text: #f2f2f2;
+  --vlanit-muted: #aaaaaa;
+  --vlanit-accent: #e6b800;
+  --vlanit-border: #333333;
+  --vlanit-input-bg: #222222;
+  --vlanit-input-border: #555555;
+  --vlanit-button-text: #111111;
+  --vlanit-error-bg: #3a1010;
+  --vlanit-error-border: #cc4444;
+  --vlanit-error-text: #ffcccc;
+}

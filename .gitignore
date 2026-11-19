@@ -5,9 +5,20 @@
 /tools/podman-root/
 /tools/podman-etc/
 /tools/podman-debs/
+# symlink-хвосты worktree (игнор и для dir, и для symlink)
+/tools/root
+/tools/debs
+/tools/podman-root
+/tools/podman-etc
+/tools/podman-debs
+
 *.log
 # выхлопы запусков — не исходники
 __pycache__/
 *.pyc
 .gstack/
+# Rust build (vlanit-tui); бинарь кладётся при scripts/build-tui.sh / make iso
+installer/tui-cursive/target/
+installer/bin/vlanit-tui
 # приватный ключ релиза хранится ВНЕ репозитория (~/.vlanit-release-gnupg)
+.cursor/

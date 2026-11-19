@@ -4,6 +4,19 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.0 (2026-11-19)
+
+- Установщик: primary UI — HTML + `netsurf-fb`; fallback Cursive
+  (`vlanit-tui`), затем `dialog`. Реестр экранов
+  `installer/screens.yaml` (порядок / `enabled`); профили брендинга
+  `installer/branding/<profile>/` (`VLANIT_BRANDING`). Спека:
+  `docs/specs/gui-installer.md`, галерея `docs/gui-installer.md`.
+- Установщик: WireGuard — отдельный шаг мастера (включить после
+  установки или нет; адрес/порт). Схема JSON `wireguard.*` без
+  изменений. Формы GUI: метки и поля рядом (`table.form`, NetSurf).
+- Сборка TUI: `scripts/build-tui.sh` → `installer/bin/vlanit-tui`.
+  Kernel cmdline: `vlanit.ui=gui|tui|dialog`.
+
 ## 1.3.3 (2026-11-18)
 
 - Установщик: `dialogrc` дополнен всеми ключами темы (menubox/form/

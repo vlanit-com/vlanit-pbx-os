@@ -408,11 +408,12 @@ test_errors() {
     else fail "T7a: нет отказа на несуществующий диск"; fi
     kill_qemu "$name"
 
-    # 7b: слишком мелкий диск (20G < 50G минимума)
+    # 7b: слишком мелкий диск — Data < DATA_MIN_GIB=8 при system_size_pct=25
+    # (10 GiB → Data≈6.7; 12+ GiB уже проходит). Старое «20G < 50G» — до %-геометрии.
     local name="t7b"
     make_test_iso "$TESTDIR/t7b.iso" /autoinstall.yaml=tests/integration/autoinstall.yaml
     rm -f "$TESTDIR/t7b_disk.qcow2" "$TESTDIR/${name}_serial.log"
-    qemu-img create -f qcow2 "$TESTDIR/t7b_disk.qcow2" 20G >/dev/null
+    qemu-img create -f qcow2 "$TESTDIR/t7b_disk.qcow2" 10G >/dev/null
     run_qemu "$name" "$TESTDIR/t7b.iso" "$TESTDIR/t7b_disk.qcow2"
     if wait_serial "$TESTDIR/${name}_serial.log" "VLANIT_INSTALL_FAILED" 300; then
         pass "T7b: мелкий диск отклонён установщиком"

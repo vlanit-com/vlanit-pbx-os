@@ -12,7 +12,7 @@
 проверяет смонтированные разделы и требует явного подтверждения.
 
 ```bash
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.2.9-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.0-amd64.iso /dev/sdX
 ```
 
 (`/dev/sdX` — ваша флэшка, например `/dev/sdb`; точное имя смотрите
@@ -21,7 +21,7 @@ sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.2.9-amd64.iso /dev/sdX
 Эквивалент вручную:
 
 ```bash
-sudo dd if=VLANit-PBX-1.0-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+sudo dd if=VLANit-PBX-1.4.0-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
 sync
 ```
 
@@ -46,7 +46,7 @@ sync
 # узнать идентификатор флэшки, например disk4
 diskutil list
 diskutil unmountDisk /dev/disk4
-sudo dd if=VLANit-PBX-1.0-amd64.iso of=/dev/rdisk4 bs=4m
+sudo dd if=VLANit-PBX-1.4.0-amd64.iso of=/dev/rdisk4 bs=4m
 diskutil eject /dev/disk4
 ```
 
@@ -65,11 +65,11 @@ diskutil eject /dev/disk4
 ```bash
 # 1) подпись контрольной суммы (публичный ключ — в репозитории, rootfs/etc-vlanit-release.pub)
 gpg --no-default-keyring --keyring rootfs/etc-vlanit-release.pub \
-    --verify dist/VLANit-PBX-1.2.9-amd64.iso.sha256.asc
+    --verify dist/VLANit-PBX-1.4.0-amd64.iso.sha256.asc
 # ожидается: «Действительная подпись VLANit PBX OS Release»
 
 # 2) целостность образа
-sha256sum -c dist/VLANit-PBX-1.2.9-amd64.iso.sha256   # сверить образ до записи
+sha256sum -c dist/VLANit-PBX-1.4.0-amd64.iso.sha256   # сверить образ до записи
 # после записи — сравнить первые блоки (Linux):
 sudo head -c 1G /dev/sdX | sha256sum   # должно совпасть с началом образа
 ```
@@ -77,31 +77,40 @@ sudo head -c 1G /dev/sdX | sha256sum   # должно совпасть с нач
 ## 2. Загрузка устройства
 
 1. Вставьте USB, включите устройство, войдите в меню загрузки (F11/F12/Boot Menu).
-2. Выберите UEFI-загрузку с USB. Требуется UEFI (Legacy BIOS не поддерживается в v1).
-3. В меню GRUB выберите «Установить VLANit PBX OS 1.0 (UEFI)».
+2. Выберите UEFI-загрузку с USB. Требуется UEFI (Legacy BIOS не поддерживается).
+3. В меню GRUB выберите «Установить VLANit PBX OS … (UEFI)».
 
-Live-среда загрузится и автоматически запустит VLANit Installer (русский TUI).
+Live-среда загрузится и запустит VLANit Installer. По умолчанию —
+**графический мастер** (HTML на framebuffer через `netsurf-fb`). Если
+нет `/dev/fb0` или GUI не стартовал — Cursive TUI (`vlanit-tui`), затем
+`dialog`. Принудительно: в cmdline GRUB `vlanit.ui=gui|tui|dialog`.
+
+Галерея экранов: [`docs/gui-installer.md`](gui-installer.md).
 
 ## 3. Мастер установки
 
-1. **Оборудование** — CPU, ОЗУ, накопители, сетевые интерфейсы, режим загрузки,
-   предупреждения (например, ОЗУ < 2 ГБ).
-2. **Диск** — выбор целевого накопителя (установочный USB исключён).
-   Все данные на диске будут удалены — требуется подтверждение.
-   При наличии второго накопителя — выбор режима: один диск или
-   **зеркало RAID1** (LVM mirror: ESP на обоих дисках, vg0 с raid1-LV;
-   смерть одного диска не останавливает АТС). Диски разного размера:
-   занято min(дисков) на каждом, остаток большего не используется.
-3. **Сеть** — интерфейс, DHCP или статический IPv4 + префикс, шлюз, DNS.
-4. **Система** — hostname, локальный администратор (пароль ≥ 8 символов),
-   включение/отключение SSH, настройка WireGuard (см. ниже).
-5. **Подтверждение** — сводка и финальное согласие.
-6. **Установка** — этапы и ошибки в реальном времени, журнал: `/var/log/vlanit-install.log`.
-7. **Завершение** — версии компонентов, IP-адрес, адрес веб-интерфейса,
-   публичный ключ WireGuard (если включён), предложение перезагрузиться.
+Экраны задаются реестром `installer/screens.yaml` (порядок / `enabled`);
+GUI и TUI — одни шаги, бэкенд общий. Галерея:
+[`docs/gui-installer.md`](gui-installer.md).
 
-Минимальный размер диска — 50 GiB (EFI 1 + System 40 + Data 9).
-При меньшем объёме установка блокируется с пояснением.
+1. **Оборудование** — CPU, ОЗУ, накопители, сеть, UEFI. Без UEFI —
+   дальше нельзя.
+2. **Диск** — целевой накопитель (USB исключён); схема ESP / System /
+   Data. При втором диске — один диск или **зеркало RAID1**.
+3. **Сеть** — интерфейс, DHCP или static.
+4. **Система** — hostname, админ (пароль ≥ 8), SSH, TZ, имя/пароль
+   веб-АТС (пустой → автоген).
+5. **WireGuard** — включить после установки или нет; адрес wg0 и порт
+   (при «нет» не применяются).
+6. **Подтверждение** — сводка (в т.ч. WG) перед стиранием диска.
+7. **Установка** — прогресс % / статус / ETA; журнал
+   `/var/log/vlanit-install.log`.
+8. **Завершение** — IP, URL веб, пароль АТС / WG pubkey при наличии,
+   reboot.
+
+Минимум диска: Data-LV ≥ 8 GiB при `installer.system_size_pct` (по
+умолчанию 25 % usable). Для продакшена ориентир ≥ 50 GiB. Меньше
+минимума — отказ с пояснением до деструктивных этапов.
 
 ## Часовой пояс
 
@@ -112,7 +121,7 @@ Live-среда загрузится и автоматически запуст�
 
 ## WireGuard VPN (преднастройка при установке)
 
-Если WireGuard включён в мастере (экран «Система»), установщик:
+Если WireGuard включён в мастере (экран «WireGuard»), установщик:
 
 - генерирует уникальную пару ключей устройства (`wg genkey`);
 - создаёт `/etc/wireguard/wg0.conf` (адрес, например `10.66.66.1/24`,
@@ -165,8 +174,8 @@ ip a; ip r                        # сеть
 
 ## Автоматическая установка (для тестов/массового развёртывания)
 
-Если в корне ISO присутствует файл `/autoinstall.yaml`, установщик работает
-без диалогов (см. `tests/integration/autoinstall.yaml`):
+Если в корне ISO есть `/autoinstall.yaml`, UI не запускается — те же этапы
+из YAML (см. `tests/integration/autoinstall.yaml`):
 
 ```yaml
 disk: /dev/sda
@@ -179,7 +188,6 @@ mikopbx: { name: VLANit-PBX-001, web_admin_password: "..." }
 confirm: yes
 ```
 
-Защита: диск должен быть в списке внутренних кандидатов, размер ≥ 50 GiB
-(при зеркале — каждого из дисков), контрольные суммы payload должны сойтись.
-На реальном железе используйте с осторожностью — `confirm: yes` подтверждает
-полное стирание диска.
+Защита: диск из списка внутренних кандидатов; Data ≥ `DATA_MIN_GIB`
+(при зеркале — у каждого); checksums payload до разметки.
+На железе осторожно: `confirm: yes` = полное стирание.
