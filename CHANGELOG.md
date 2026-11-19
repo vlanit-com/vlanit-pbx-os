@@ -4,6 +4,12 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.1 (2026-11-19)
+
+- Plymouth: логотип — основной элемент splash (animation/throbber +
+  watermark RGB на `#09090b`); wait DRM перед plymouthd; docs/wiki
+  скрин `docs/branding/shots/plymouth-splash.png`.
+
 ## 1.4.0 (2026-11-19)
 
 - Установщик: primary UI — HTML + `netsurf-fb`; fallback Cursive

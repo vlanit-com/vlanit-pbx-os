@@ -1,6 +1,6 @@
 [Plymouth Theme]
 Name=VLANit
-Description=VLANit PBX OS — фирменная тема (на базе spinner, логотип vlanit.com)
+Description=VLANit PBX OS — фирменная тема (логотип как animation + watermark)
 ModuleName=two-step
 
 [two-step]
@@ -12,9 +12,9 @@ DialogVerticalAlignment=.382
 TitleHorizontalAlignment=.5
 TitleVerticalAlignment=.382
 HorizontalAlignment=.5
-VerticalAlignment=.7
+VerticalAlignment=.5
 WatermarkHorizontalAlignment=.5
-WatermarkVerticalAlignment=.9
+WatermarkVerticalAlignment=.88
 Transition=none
 TransitionDuration=0.0
 BackgroundStartColor=0x09090b
