@@ -289,7 +289,7 @@ WARN, не FAIL. Спека: `docs/specs/t11-performance-baseline.md`.
 - plymouth-brand-splash — фирменная заставка на загрузке live и
   установленной системы (факты — verply).
 
-## GUI / Cursive installer 1.4.0 (идея #12)
+## GUI / Cursive installer 1.4.0–1.4.1 (идея #12, эпик #46 — закрыт)
 
 Одна фича — одна проверка:
 
@@ -304,9 +304,11 @@ WARN, не FAIL. Спека: `docs/specs/t11-performance-baseline.md`.
   NetSurf без JS.
 - `tests/unit/test-config-json.sh` — round-trip install-config.json
   (PASS 2026-11-19).
-- Autoinstall QEMU — без UI (регрессия бэкенда).
-- Ручные: GUI на fb0; `vlanit.ui=tui`; `vlanit.ui=dialog`; спайк
-  `scripts/spike-netsurf-fb.sh`. Спека: `docs/specs/gui-installer.md`.
+- Autoinstall QEMU — без UI (регрессия бэкенда); полный
+  `regress-full` на 1.4.0 PASS.
+- OpenSpec `installer-wg-step-form-align` archived 2026-11-19.
+- Ручные / follow-up: GUI на железе (`netsurf-fb` ≥2 модели) — вне
+  эпика #46. Спека: `docs/specs/gui-installer.md`.
 
 ## Не автоматизируется в v1 (ручные сценарии)
 

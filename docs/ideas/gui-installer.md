@@ -1,9 +1,11 @@
 # Идея #12: графический HTML-установщик с fallback на Cursive TUI
 
-Статус: РЕАЛИЗОВАНО в ветке `feature/gui-installer` (2026-11-19);
-регресс T1–T9+mirror PASS. До GA: полевой спайк netsurf-fb на ≥2
-моделях. Спека: `docs/specs/gui-installer.md`. Галерея:
-`docs/gui-installer.md`. Инструкция: `docs/installation.md` §2–3.
+Статус: **РЕАЛИЗОВАНО** (релизы 1.4.0–1.4.1). Эпик #46 закрыт.
+Спека: `docs/specs/gui-installer.md`. Галерея: `docs/gui-installer.md`.
+Инструкция: `docs/installation.md` §2–3. OpenSpec archived:
+`openspec/changes/archive/2026-11-19-installer-wg-step-form-align/`.
+
+Полевой netsurf-fb на флоте — follow-up (не блокер идеи).
 
 ## Запрос
 
@@ -11,7 +13,7 @@
 картинки на страницах, multi-field формы. Аппаратная поддержка
 отображения обязательна; TUI остаётся fallback.
 
-## Решения (as-designed)
+## Решения (as-designed / as-built)
 
 - **Цели:** бренд/картинки + UX форм; удалёнка не в скоупе.
 - **Primary:** HTML + `netsurf-fb` на `/dev/fb0` (без X/Chromium).
@@ -19,6 +21,8 @@
 - **Бэкенд:** bash-логика установки; autoinstall YAML мимо обоих UI.
 - **`dillo-fb` в Debian trixie нет** (пакет `dillo` тянет X11/FLTK) —
   только `netsurf-fb`.
+- **Реестр экранов** `installer/screens.yaml`; брендинг
+  `installer/branding/<profile>/` (`VLANIT_BRANDING`).
 
 ## Почему это реалистично на нашем железе
 
@@ -53,7 +57,7 @@ vlanit-installer (entry)
 - Запуск: `netsurf-fb -f linux URL` или `-f sdl` в QEMU.
 - Кириллица: freetype + системные шрифты (`fonts-dejavu-core` в live).
 - Проверка: `scripts/spike-netsurf-fb.sh` (QEMU/live); флот — вручную
-  на ≥2 моделях до GA.
+  на ≥2 моделях (follow-up к эпику #46).
 
 ## Отклонённые альтернативы
 
