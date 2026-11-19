@@ -36,6 +36,9 @@ jobs:
       - name: Сборка ISO
         run: make iso
 
+      - name: Guard размера ISO
+        run: bash scripts/check-iso-size.sh
+
       - name: Подпись контрольных сумм (GPG)
         env:
           RELEASE_GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}

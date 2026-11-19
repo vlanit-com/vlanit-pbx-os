@@ -17,6 +17,10 @@
   ISO из любого источника.
 - Push workflow-файлов требует scope `workflow` у токена
   (`gh auth refresh -s workflow`).
+- **Guard размера ISO** (после `make iso`): `scripts/check-iso-size.sh`
+  против `output.iso_baseline_mib` / `iso_size_margin_pct` в
+  `config/build.yaml`. Спека: `docs/specs/iso-size-guard.md`. При
+  осознанном росте образа — поднять baseline в том же PR.
 
 ## Бамп и changelog
 
