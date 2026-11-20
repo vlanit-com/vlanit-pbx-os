@@ -63,7 +63,8 @@
 ## Learned User Preferences
 
 - GUI-установщик: HTML+FB primary; Cursive fallback; dialog не primary.
-- UI править в `installer/gui/` (+fallback при нужде); скрины после UI.
+- UI править в `installer/gui/` / `doctor/gui/` (+fallback при нужде);
+  скрины после UI.
 - Формы: одна вертикаль полей; схемы дисков не ломать колонки.
 - Wiki/user docs установки — под GUI-мастер; текст+скрины вместе.
 
@@ -81,8 +82,13 @@ git-ветку или одноразовый статус задачи.
   не виден в docker-mount).
 - TUI-сборка: `scripts/build-tui.sh` (Docker `rust:1.85-bookworm`) →
   `installer/bin/vlanit-tui`.
-- Галерея UI: `docs/gui-installer.md` + `shots/`; установка:
+- Галереи UI: installer `docs/gui-installer.md` + `shots/`; doctor
+  `docs/doctor-gui.md` + `docs/doctor-gui/shots/`; установка
   `docs/installation.md`.
+- Doctor: CLI `rootfs/vlanit-doctor` + GUI `doctor/gui/`
+  (`vlanit-doctor --gui`); проверки в `rootfs/lib-checks.sh`.
+- ISO slim: `scripts/slim-rootfs.sh` (locale/doc/plymouth; из golden/live
+  rootfs hooks).
 - Plymouth без железа: QEMU burst PPM / `virtio-vga` —
   `docs/specs/1.3.2-plymouth-verify.md`.
 - Полевой план: `docs/specs/field-visit-plan.md`.

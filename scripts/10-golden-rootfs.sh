@@ -22,6 +22,7 @@ btrfs-progs dosfstools e2fsprogs lvm2 gdisk efibootmgr
 openssh-server sudo login
 curl ca-certificates jq zstd
 python3 python3-minimal python3-yaml
+netsurf-fb netsurf-common
 tzdata kbd
 iproute2 iputils-ping ethtool pciutils usbutils smartmontools nvme-cli dmidecode
 iptables nftables
@@ -137,8 +138,25 @@ touch "$ROOTFS/var/lib/vlanit/dockerenv"
 # диагностика (issue #9): doctor + общая библиотека проверок
 install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-doctor" \
     "$ROOTFS/usr/local/sbin/vlanit-doctor"
+install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-doctor-gui" \
+    "$ROOTFS/usr/local/sbin/vlanit-doctor-gui"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/lib-checks.sh" \
     "$ROOTFS/opt/vlanit/lib/checks.sh"
+# doctor GUI (issue #56): HTTP + netsurf-fb
+install -d -m 0755 "$ROOTFS/opt/vlanit/doctor/static" \
+    "$ROOTFS/opt/vlanit/doctor/templates"
+install -D -m 0755 "$PROJECT_ROOT/doctor/gui/server.py" \
+    "$ROOTFS/opt/vlanit/doctor/server.py"
+install -D -m 0755 "$PROJECT_ROOT/doctor/gui/launch-gui.sh" \
+    "$ROOTFS/opt/vlanit/doctor/launch-gui.sh"
+install -D -m 0644 "$PROJECT_ROOT/doctor/gui/templates/layout.html" \
+    "$ROOTFS/opt/vlanit/doctor/templates/layout.html"
+install -D -m 0644 "$PROJECT_ROOT/doctor/gui/static/style.css" \
+    "$ROOTFS/opt/vlanit/doctor/static/style.css"
+if [ -f "$PROJECT_ROOT/installer/branding/default/logo.png" ]; then
+    install -D -m 0644 "$PROJECT_ROOT/installer/branding/default/logo.png" \
+        "$ROOTFS/opt/vlanit/doctor/static/logo.png"
+fi
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-release.pub" \
     "$ROOTFS/etc/vlanit/release.pub"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-update.conf" \

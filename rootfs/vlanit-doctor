@@ -5,7 +5,8 @@
 #   vlanit-doctor              — полный отчёт (OK/FAIL/SKIP по группам)
 #   vlanit-doctor --quiet      — только код возврата (0 = всё зелёное)
 #   vlanit-doctor --fix-hints  — под каждой проблемой команда-исправление
-#   vlanit-doctor --json       — машиночитаемый вывод
+#   vlanit-doctor --json       — машиночитаемый вывод (desc+hint)
+#   vlanit-doctor --gui        — HTML+framebuffer UI (issue #56)
 #
 # Код возврата: 0 — все применимые проверки OK; 1 — есть FAIL.
 # Скрипт read-only: ничего не меняет в системе.
@@ -17,13 +18,23 @@ CHECKS_LIB="/opt/vlanit/lib/checks.sh"
 # shellcheck disable=SC1090
 source "$CHECKS_LIB"
 
+_json_str() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+
 QUIET=0 JSON=0 HINTS=0
 for a in "$@"; do
     case "$a" in
         --quiet) QUIET=1 ;;
         --json) JSON=1 ;;
         --fix-hints) HINTS=1 ;;
-        -h|--help) grep '^#' "$0" | head -12 | cut -c3-; exit 0 ;;
+        --gui)
+            GUI_LAUNCH="${VLANIT_DOCTOR_GUI:-/opt/vlanit/doctor/launch-gui.sh}"
+            [ -x "$GUI_LAUNCH" ] || {
+                echo "vlanit-doctor: GUI не установлен ($GUI_LAUNCH)" >&2
+                exit 2
+            }
+            exec "$GUI_LAUNCH"
+            ;;
+        -h|--help) grep '^#' "$0" | head -13 | cut -c3-; exit 0 ;;
         *) echo "vlanit-doctor: неизвестная опция $a (см. --help)" >&2; exit 2 ;;
     esac
 done
@@ -44,8 +55,10 @@ report() {
     esac
     [ "$QUIET" = "1" ] && return
     if [ "$JSON" = "1" ]; then
-        printf -v JQ_OUT '%s%s' "$JQ_OUT" \
-            "$(printf '\n    {"group":"%s","check":"%s","status":"%s"},' "$group" "$name" "$st")"
+        printf -v JQ_OUT '%s%s' "$JQ_OUT" "$(printf \
+            '\n    {"group":%s,"check":%s,"status":%s,"desc":%s,"hint":%s},' \
+            "$(_json_str "$group")" "$(_json_str "$name")" "$(_json_str "$st")" \
+            "$(_json_str "$(desc_"$name")")" "$(_json_str "$(hint_"$name")")")"
         return
     fi
     case "$st" in

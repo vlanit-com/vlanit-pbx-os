@@ -121,18 +121,21 @@ firstboot-логика осталась идемпотентной подстр�
 
 ## Диагностика на устройстве
 
-**`vlanit-doctor`** (с 1.2.9) — сводный контроль здоровья установленной ОС:
+**`vlanit-doctor`** (с 1.2.8) — сводный контроль здоровья установленной ОС:
 
 ```bash
 vlanit-doctor              # полный отчёт (OK/FAIL/SKIP по группам)
 vlanit-doctor --quiet      # только код возврата 0/1 (для скриптов/мониторинга)
 vlanit-doctor --fix-hints  # под каждой проблемой — команда исправления
 vlanit-doctor --json       # машиночитаемый вывод
+vlanit-doctor --gui        # HTML + framebuffer (консоль; #56)
+# или: vlanit-doctor-gui
 ```
 
 Проверки из общей библиотеки `/opt/vlanit/lib/checks.sh` (тот же источник,
 что у QEMU-тест-агента): система, диски/Btrfs, сеть, firewall, SSH, MikoPBX,
-журналы, обновления. Спека: `docs/specs/1.2.9-vlanit-doctor.md`.
+журналы, обновления. Спеки: `docs/specs/1.2.8-vlanit-doctor.md`,
+`docs/specs/vlanit-doctor-gui.md`.
 
 ## Требования к сборочной машине
 
