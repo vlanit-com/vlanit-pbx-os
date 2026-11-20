@@ -29,7 +29,9 @@ read-only GUI диагностики (команда `vlanit-doctor --gui` и/и
 
 GUI MUST отображать результаты тех же проверок и групп, что даёт
 `vlanit-doctor --json` / библиотека checks. Статусы MUST быть
-`OK` / `FAIL` / `SKIP`. GUI MUST NOT изменять систему.
+`OK` / `FAIL` / `WARN` / `SKIP`. GUI MUST NOT изменять систему.
+GUI MUST показывать индикатор ожидания во время прогона и MUST
+поддерживать фильтр проблем (FAIL и WARN).
 
 #### Scenario: Overview matches JSON result
 

@@ -15,7 +15,7 @@
 - `01`–`05` — иллюстрации типового вывода команд (не замена стенда)
 
 Диагностика: CLI `vlanit-doctor` / на консоли с FB — `vlanit-doctor --gui`
-(HTML+netsurf; #56). Спека: `docs/specs/vlanit-doctor-gui.md`.
+(HTML+netsurf; #56). Руководство + скрины: [`docs/doctor-gui.md`](doctor-gui.md).
 
 Спеки: `docs/specs/mirror-two-disk.md`, `docs/specs/backup-usb.md`,
 `docs/specs/parity-matrix.md`.

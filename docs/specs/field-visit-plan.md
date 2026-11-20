@@ -53,7 +53,9 @@ ISO: [v1.4.1](https://github.com/vlanit-com/vlanit-pbx-os/releases/tag/v1.4.1)
 Под админом из мастера:
 
 ```bash
-sudo vlanit-doctor
+sudo vlanit-doctor --fix-hints
+# на консоли с монитором (опционально):
+# sudo vlanit-doctor --gui
 systemctl is-active mikopbx
 podman ps
 # если WG включали:

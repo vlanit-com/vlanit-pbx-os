@@ -1,5 +1,15 @@
 # Диагностика проблем (troubleshooting)
 
+Сначала на установленном устройстве:
+
+```bash
+sudo vlanit-doctor --fix-hints    # CLI
+sudo vlanit-doctor --gui          # консоль с монитором
+```
+
+Руководство и скрины: [`docs/doctor-gui.md`](doctor-gui.md).  
+`--quiet` = 0 при только WARN (degraded зеркало — ожидаемо).
+
 ## Не загружается с USB
 
 - Проверьте, что загрузка именно **UEFI** (в Boot Menu пункт с пометкой UEFI).

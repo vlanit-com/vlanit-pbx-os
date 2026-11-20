@@ -28,3 +28,11 @@
 
 - [x] 5.1 README: как открыть doctor GUI на консоли
 - [x] 5.2 runbooks: упоминание GUI рядом с CLI (скрин — после QEMU)
+
+## 6. Field checks + GUI polish
+
+- [x] 6.1 WARN(3) в контракте; `lvm-mirror-health` деградация → WARN
+- [x] 6.2 checks: ntp-synchronized, btrfs-device-stats, efi-esp,
+      wireguard-handshake; dns без route → SKIP
+- [x] 6.3 GUI: progress (meta-refresh), фильтр `?fail=1`
+- [x] 6.4 unit lib + gui обновлены

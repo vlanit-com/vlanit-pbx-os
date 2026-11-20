@@ -9,10 +9,14 @@ CLI `vlanit-doctor` на консоли с FB неудобен. Установщ
 ## 1. Решение
 
 - `doctor/gui/server.py` + `launch-gui.sh` → `/opt/vlanit/doctor/`
-- Данные: `vlanit-doctor --json` (поля `desc`, `hint`)
+- Данные: `vlanit-doctor --json` (поля `desc`, `hint`; статусы OK/FAIL/WARN/SKIP)
 - Запуск: `vlanit-doctor --gui` / `vlanit-doctor-gui`
 - Golden: пакеты `netsurf-fb` `netsurf-common`
 - Без `/dev/fb0` → exit 2 + подсказка CLI (`VLANIT_FB_SURFACE=sdl` для стенда)
+- GUI: экран progress (meta-refresh), фильтр `?fail=1` (FAIL+WARN)
+- Checks (поле): `ntp-synchronized`, `btrfs-device-stats`, `efi-esp`,
+  `wireguard-handshake`; `lvm-mirror-health` деградация → **WARN(3)**;
+  DNS без default route → SKIP. `--quiet` = 0 при только WARN.
 
 ## 2. Отклонённые
 
@@ -23,6 +27,7 @@ CLI `vlanit-doctor` на консоли с FB неудобен. Установщ
 ## 3. Проверка
 
 ```bash
+bash tests/unit/test-doctor-lib.sh
 bash tests/unit/test-doctor-gui.sh
 # на устройстве с FB:
 sudo vlanit-doctor --gui

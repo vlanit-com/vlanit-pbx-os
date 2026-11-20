@@ -8,6 +8,8 @@ trap 'rm -rf "$TMP"; kill $SRV_PID 2>/dev/null || true' EXIT
 
 cat >"$TMP/fake-doctor.sh" <<'EOF'
 #!/usr/bin/env bash
+# чуть задержки — проверить progress page
+sleep 0.3
 cat <<'JSON'
 {
   "host": "vlanit-test",
@@ -15,6 +17,7 @@ cat <<'JSON'
   "checks": [
     {"group":"system","check":"hostname","status":"OK","desc":"hostname задан","hint":"hostnamectl ..."},
     {"group":"system","check":"timesyncd","status":"FAIL","desc":"синхронизация времени","hint":"systemctl enable --now systemd-timesyncd"},
+    {"group":"disks","check":"lvm-mirror-health","status":"WARN","desc":"зеркало","hint":"lvs -a"},
     {"group":"network","check":"dns-resolve","status":"SKIP","desc":"DNS","hint":""}
   ]
 }
@@ -36,11 +39,29 @@ for _ in $(seq 1 50); do
     sleep 0.05
 done
 
-OVERVIEW="$(curl -fsS "http://127.0.0.1:${VLANIT_DOCTOR_PORT}/")"
+# progress или сразу сводка
+first="$(curl -fsS "http://127.0.0.1:${VLANIT_DOCTOR_PORT}/" || true)"
+echo "$first" | grep -qE 'Итог: FAIL|Идёт проверка'
+
+# дождаться готовой сводки
+OVERVIEW=""
+for _ in $(seq 1 40); do
+    OVERVIEW="$(curl -fsS "http://127.0.0.1:${VLANIT_DOCTOR_PORT}/")"
+    echo "$OVERVIEW" | grep -q 'Итог: FAIL' && break
+    sleep 0.1
+done
 echo "$OVERVIEW" | grep -q 'Итог: FAIL'
 echo "$OVERVIEW" | grep -q 'system'
-echo "$OVERVIEW" | grep -q 'network'
+echo "$OVERVIEW" | grep -q 'WARN'
+echo "$OVERVIEW" | grep -q 'Только FAIL/WARN'
 echo "$OVERVIEW" | grep -q '/group/system'
+
+FILT="$(curl -fsS "http://127.0.0.1:${VLANIT_DOCTOR_PORT}/?fail=1")"
+echo "$FILT" | grep -q 'timesyncd'
+echo "$FILT" | grep -q 'lvm-mirror-health'
+# hostname OK не в списке проблем (карточки)
+echo "$FILT" | grep -q 'Проблемы'
+! echo "$FILT" | grep -q 'hostname задан'
 
 GROUP="$(curl -fsS "http://127.0.0.1:${VLANIT_DOCTOR_PORT}/group/system")"
 echo "$GROUP" | grep -q 'timesyncd'

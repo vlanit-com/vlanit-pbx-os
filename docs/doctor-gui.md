@@ -1,25 +1,63 @@
-# Галерея: vlanit-doctor GUI (#56)
+# Руководство: vlanit-doctor GUI
 
-HTML + framebuffer (как установщик). Mock-данные для скринов
-(не живой прогон на боксе).
+Диагностика установленной VLANit PBX OS на консоли (HTML + `netsurf-fb`),
+по аналогии с GUI-установщиком. Issue #56.
+Спека: [`docs/specs/vlanit-doctor-gui.md`](specs/vlanit-doctor-gui.md).
+CLI as-built: [`docs/specs/1.2.8-vlanit-doctor.md`](specs/1.2.8-vlanit-doctor.md).
+Установка / после firstboot: [`docs/installation.md`](installation.md) §5.
+
+## Запуск
+
+На устройстве (нужен `/dev/fb0`, обычно root):
 
 ```bash
-# переснять:
-# (см. scripts — пока chrome headless на VLANIT_DOCTOR_CMD fixture)
-ls docs/doctor-gui/shots/
+sudo vlanit-doctor --gui
+# или
+sudo vlanit-doctor-gui
 ```
 
-## 1. Сводка
+Без framebuffer процесс завершится с подсказкой использовать CLI.
+Для стенда QEMU: `VLANIT_FB_SURFACE=sdl`.
 
-![Сводка doctor](doctor-gui/shots/01-overview.png)
+CLI (SSH / скрипты):
 
-## 2. Группа system (FAIL + hint)
+```bash
+vlanit-doctor              # полный отчёт
+vlanit-doctor --quiet      # 0 = нет FAIL (WARN допустим)
+vlanit-doctor --fix-hints
+vlanit-doctor --json
+```
 
-![Группа system](doctor-gui/shots/02-group-system.png)
+## Что видно
 
-## 3. Группа mikopbx
+1. **Progress** — идёт прогон (до ~30 с), auto-refresh.
+2. **Сводка** — итог OK / WARN / FAIL, счётчики по группам.
+3. **Группа** — каждая проверка + hint при FAIL/WARN.
+4. **Только FAIL/WARN** — фильтр проблем.
 
-![Группа mikopbx](doctor-gui/shots/03-group-mikopbx.png)
+Статусы: **OK** · **FAIL** · **WARN** (напр. degraded LVM mirror) · **SKIP**.
+GUI ничего не меняет в системе.
 
-Запуск на устройстве: `sudo vlanit-doctor --gui`.  
-Спека: `docs/specs/vlanit-doctor-gui.md`.
+Скрины ниже — mock (типичный FAIL+WARN), не живой бокс.
+
+---
+
+## Progress
+
+![Progress](doctor-gui/shots/00-progress.png)
+
+## Сводка
+
+![Сводка](doctor-gui/shots/01-overview.png)
+
+## Только FAIL/WARN
+
+![Проблемы](doctor-gui/shots/02-problems.png)
+
+## Группа disks (WARN зеркало)
+
+![disks](doctor-gui/shots/03-group-disks.png)
+
+## Группа system (FAIL NTP)
+
+![system](doctor-gui/shots/04-group-system.png)

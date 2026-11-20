@@ -22,6 +22,7 @@ DONE_FILE = Path(os.environ.get("VLANIT_DOCTOR_DONE", "/run/vlanit/doctor-gui-do
 _cache_lock = threading.Lock()
 _cache: dict | None = None
 _cache_err: str | None = None
+_running = False
 
 
 def _run_doctor() -> tuple[dict | None, str | None]:
@@ -42,12 +43,31 @@ def _run_doctor() -> tuple[dict | None, str | None]:
         return None, str(exc)
 
 
-def get_report(*, refresh: bool = False) -> tuple[dict | None, str | None]:
-    global _cache, _cache_err
+def _bg_run() -> None:
+    global _cache, _cache_err, _running
+    data, err = _run_doctor()
     with _cache_lock:
-        if refresh or _cache is None:
-            _cache, _cache_err = _run_doctor()
-        return _cache, _cache_err
+        _cache, _cache_err = data, err
+        _running = False
+
+
+def get_report(*, refresh: bool = False) -> tuple[dict | None, str | None, bool]:
+    """Returns (data, err, running). running=True → ещё идёт прогон."""
+    global _cache, _cache_err, _running
+    with _cache_lock:
+        if refresh:
+            _cache = None
+            _cache_err = None
+            if not _running:
+                _running = True
+                threading.Thread(target=_bg_run, daemon=True).start()
+            return None, None, True
+        if _cache is not None or _cache_err:
+            return _cache, _cache_err, False
+        if not _running:
+            _running = True
+            threading.Thread(target=_bg_run, daemon=True).start()
+        return None, None, True
 
 
 def group_stats(checks: list[dict]) -> dict[str, dict[str, int]]:
@@ -55,9 +75,11 @@ def group_stats(checks: list[dict]) -> dict[str, dict[str, int]]:
     for c in checks:
         g = c.get("group") or "?"
         st = c.get("status") or "SKIP"
-        bucket = out.setdefault(g, {"OK": 0, "FAIL": 0, "SKIP": 0, "total": 0})
+        bucket = out.setdefault(
+            g, {"OK": 0, "FAIL": 0, "WARN": 0, "SKIP": 0, "total": 0}
+        )
         bucket["total"] += 1
-        if st in ("OK", "FAIL", "SKIP"):
+        if st in ("OK", "FAIL", "WARN", "SKIP"):
             bucket[st] += 1
         else:
             bucket["SKIP"] += 1
@@ -82,70 +104,113 @@ def render_layout(title: str, body: str, *, refresh_sec: int | None = None) -> b
     return page.encode("utf-8")
 
 
-def page_overview(data: dict) -> bytes:
+def page_running() -> bytes:
+    body = """
+<p class="muted">Идёт проверка (до ~30 с)…</p>
+<div class="card"><p>Ждите — страница обновится автоматически.</p></div>
+<p class="actions"><a class="btn" href="/">Обновить сейчас</a></p>
+"""
+    return render_layout("doctor · проверка", body, refresh_sec=2)
+
+
+def _check_card(c: dict) -> str:
+    st = c.get("status") or "SKIP"
+    name = html.escape(str(c.get("check") or ""))
+    desc = html.escape(str(c.get("desc") or ""))
+    hint = html.escape(str(c.get("hint") or ""))
+    hint_html = ""
+    if hint and st in ("FAIL", "WARN"):
+        label = "исправить" if st == "FAIL" else "см."
+        hint_html = f'<div class="hint">{label}: <code>{hint}</code></div>'
+    return (
+        f'<div class="card check-{html.escape(st.lower())}">'
+        f'<div><span class="badge st-{html.escape(st.lower())}">{html.escape(st)}</span> '
+        f"<strong>{name}</strong></div>"
+        f'<p class="muted">{desc}</p>{hint_html}</div>'
+    )
+
+
+def page_overview(data: dict, *, problems_only: bool = False) -> bytes:
     result = data.get("result", "?")
     host = data.get("host", "")
-    checks = data.get("checks") or []
-    stats = group_stats(checks)
-    fail_n = sum(1 for c in checks if c.get("status") == "FAIL")
-    ok_n = sum(1 for c in checks if c.get("status") == "OK")
-    skip_n = sum(1 for c in checks if c.get("status") == "SKIP")
+    checks = list(data.get("checks") or [])
+    if problems_only:
+        checks = [c for c in checks if c.get("status") in ("FAIL", "WARN")]
+    stats = group_stats(data.get("checks") or [])
+    fail_n = sum(1 for c in (data.get("checks") or []) if c.get("status") == "FAIL")
+    warn_n = sum(1 for c in (data.get("checks") or []) if c.get("status") == "WARN")
+    ok_n = sum(1 for c in (data.get("checks") or []) if c.get("status") == "OK")
+    skip_n = sum(1 for c in (data.get("checks") or []) if c.get("status") == "SKIP")
 
-    cls = "ok" if result == "OK" else "fail"
+    cls = {"OK": "ok", "WARN": "warn", "FAIL": "fail"}.get(str(result), "fail")
     rows = []
     for g, st in stats.items():
-        badge = "fail" if st["FAIL"] else ("ok" if st["OK"] else "skip")
+        if problems_only and st["FAIL"] == 0 and st["WARN"] == 0:
+            continue
+        badge = (
+            "fail"
+            if st["FAIL"]
+            else ("warn" if st["WARN"] else ("ok" if st["OK"] else "skip"))
+        )
+        q = "?fail=1" if problems_only else ""
         rows.append(
             "<tr>"
-            f'<td><a href="/group/{html.escape(g)}">{html.escape(g)}</a></td>'
-            f'<td class="st-{badge}">{st["OK"]} OK / {st["FAIL"]} FAIL / {st["SKIP"]} SKIP</td>'
+            f'<td><a href="/group/{html.escape(g)}{q}">{html.escape(g)}</a></td>'
+            f'<td class="st-{badge}">{st["OK"]} OK / {st["FAIL"]} FAIL / '
+            f'{st["WARN"]} WARN / {st["SKIP"]} SKIP</td>'
             "</tr>"
         )
+
+    filter_btn = (
+        '<a class="btn secondary" href="/">Все</a>'
+        if problems_only
+        else '<a class="btn secondary" href="/?fail=1">Только FAIL/WARN</a>'
+    )
+    detail = ""
+    if problems_only:
+        cards = [_check_card(c) for c in checks]
+        detail = f"<h2>Проблемы</h2>{''.join(cards) if cards else '<p class=\"muted\">Нет FAIL/WARN</p>'}"
+
     body = f"""
 <p class="muted">Хост: {html.escape(str(host))} · read-only · те же проверки, что CLI</p>
 <div class="card result-{cls}">
   <h2>Итог: {html.escape(str(result))}</h2>
-  <p>{ok_n} OK · {fail_n} FAIL · {skip_n} SKIP</p>
+  <p>{ok_n} OK · {fail_n} FAIL · {warn_n} WARN · {skip_n} SKIP</p>
 </div>
 <table class="data">
   <tr><th>Группа</th><th>Статусы</th></tr>
   {"".join(rows)}
 </table>
+{detail}
 <p class="actions">
   <a class="btn" href="/?refresh=1">Обновить</a>
+  {filter_btn}
   <a class="btn secondary" href="/quit">Выход</a>
 </p>
 """
     return render_layout("VLANit doctor", body)
 
 
-def page_group(data: dict, group: str) -> bytes:
+def page_group(data: dict, group: str, *, problems_only: bool = False) -> bytes:
     checks = [c for c in (data.get("checks") or []) if c.get("group") == group]
-    rows = []
-    for c in checks:
-        st = c.get("status") or "SKIP"
-        name = html.escape(str(c.get("check") or ""))
-        desc = html.escape(str(c.get("desc") or ""))
-        hint = html.escape(str(c.get("hint") or ""))
-        hint_html = (
-            f'<div class="hint">исправить: <code>{hint}</code></div>'
-            if st == "FAIL" and hint
-            else ""
-        )
-        rows.append(
-            f'<div class="card check-{html.escape(st.lower())}">'
-            f'<div><span class="badge st-{html.escape(st.lower())}">{html.escape(st)}</span> '
-            f"<strong>{name}</strong></div>"
-            f'<p class="muted">{desc}</p>{hint_html}</div>'
-        )
+    if problems_only:
+        checks = [c for c in checks if c.get("status") in ("FAIL", "WARN")]
+    rows = [_check_card(c) for c in checks]
     if not rows:
-        rows.append('<p class="err">Группа не найдена или пуста.</p>')
+        rows.append('<p class="err">Нет пунктов (группа пуста или фильтр).</p>')
+    back = "/?fail=1" if problems_only else "/"
+    filt = (
+        f'<a class="btn secondary" href="/group/{html.escape(group)}">Все в группе</a>'
+        if problems_only
+        else f'<a class="btn secondary" href="/group/{html.escape(group)}?fail=1">Только FAIL/WARN</a>'
+    )
     body = f"""
-<p><a href="/">← сводка</a></p>
+<p><a href="{back}">← сводка</a></p>
 <h2>Группа: {html.escape(group)}</h2>
 {"".join(rows)}
 <p class="actions">
-  <a class="btn secondary" href="/">Сводка</a>
+  <a class="btn secondary" href="{back}">Сводка</a>
+  {filt}
   <a class="btn" href="/?refresh=1">Обновить</a>
 </p>
 """
@@ -153,7 +218,10 @@ def page_group(data: dict, group: str) -> bytes:
 
 
 def page_error(msg: str) -> bytes:
-    body = f'<p class="err">{html.escape(msg)}</p><p class="actions"><a class="btn" href="/?refresh=1">Повторить</a></p>'
+    body = (
+        f'<p class="err">{html.escape(msg)}</p>'
+        '<p class="actions"><a class="btn" href="/?refresh=1">Повторить</a></p>'
+    )
     return render_layout("doctor · ошибка", body)
 
 
@@ -161,7 +229,9 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:  # quieter
         pass
 
-    def _send(self, code: int, body: bytes, content_type: str = "text/html; charset=utf-8") -> None:
+    def _send(
+        self, code: int, body: bytes, content_type: str = "text/html; charset=utf-8"
+    ) -> None:
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -173,6 +243,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path or "/"
         qs = parse_qs(parsed.query)
+        problems = qs.get("fail", ["0"])[0] in ("1", "true", "yes")
 
         if path.startswith("/static/"):
             rel = path[len("/static/") :]
@@ -183,7 +254,9 @@ class Handler(BaseHTTPRequestHandler):
             if not fpath.is_file():
                 self._send(404, b"not found")
                 return
-            ctype = "image/png" if fpath.suffix == ".png" else "text/css; charset=utf-8"
+            ctype = (
+                "image/png" if fpath.suffix == ".png" else "text/css; charset=utf-8"
+            )
             self._send(200, fpath.read_bytes(), ctype)
             return
 
@@ -200,18 +273,21 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         refresh = qs.get("refresh", ["0"])[0] in ("1", "true", "yes")
-        data, err = get_report(refresh=refresh)
+        data, err, running = get_report(refresh=refresh)
+        if running and data is None and err is None:
+            self._send(200, page_running())
+            return
         if err and data is None:
             self._send(200, page_error(err))
             return
         assert data is not None
 
         if path == "/" or path == "/index.html":
-            self._send(200, page_overview(data))
+            self._send(200, page_overview(data, problems_only=problems))
             return
         if path.startswith("/group/"):
             group = path[len("/group/") :]
-            self._send(200, page_group(data, group))
+            self._send(200, page_group(data, group, problems_only=problems))
             return
         self._send(404, page_error("Страница не найдена"))
 
@@ -220,7 +296,6 @@ def main() -> None:
     DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
     if DONE_FILE.exists():
         DONE_FILE.unlink()
-    # первый прогон в фоне, чтобы / сразу ответил (или refresh подхватит)
     threading.Thread(target=lambda: get_report(refresh=True), daemon=True).start()
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"vlanit-doctor-gui: http://127.0.0.1:{PORT}/", flush=True)

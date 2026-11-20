@@ -43,8 +43,10 @@ h2 {
   margin: 14px 0;
 }
 .result-ok { border-color: #2a6; }
+.result-warn { border-color: #e6b800; }
 .result-fail { border-color: #c44; }
 .check-fail { border-color: #c44; }
+.check-warn { border-color: #e6b800; }
 .check-ok { border-color: #2a6; }
 .check-skip { border-color: #555; }
 .badge {
@@ -55,6 +57,7 @@ h2 {
 }
 .st-ok { color: #6c6; }
 .st-fail { color: #f88; }
+.st-warn { color: #e6b800; }
 .st-skip { color: #999; }
 .hint {
   margin-top: 8px;

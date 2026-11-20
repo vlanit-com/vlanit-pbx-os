@@ -5,7 +5,9 @@
 # (полевой диагностический инструмент на установленном устройстве).
 #
 # Контракт:
-#   check_<name>() -> 0 = OK, 1 = FAIL, 2 = SKIP (не применимо)
+#   check_<name>() -> 0 = OK, 1 = FAIL, 2 = SKIP, 3 = WARN
+#     WARN — ожидаемое/деградированное (напр. raid1 с изъятым диском);
+#     vlanit-doctor --quiet = 0 при только WARN (без FAIL).
 #   hint_<name>()  -> строка подсказки исправления (для --fix-hints)
 #   desc_<name>()  -> короткое описание проверки
 #   CHECK_GROUPS: карта group -> список имён проверок (порядок вывода)
@@ -14,9 +16,9 @@
 
 # --- группы (для отчёта) ---
 CHECK_GROUPS=(
-    "system:hostname timezone-set timesyncd apt-security-source unattended-upgrades"
-    "disks:btrfs-root btrfs-subvol-mikopbx-cf fstab-uuid btrfs-snapshot-list disk-space lvm-layout lvm-mirror-health"
-    "network:networkd-active network-address dns-resolve wireguard-active"
+    "system:hostname timezone-set timesyncd ntp-synchronized apt-security-source unattended-upgrades"
+    "disks:btrfs-root btrfs-subvol-mikopbx-cf fstab-uuid btrfs-snapshot-list btrfs-device-stats disk-space lvm-layout lvm-mirror-health efi-esp"
+    "network:networkd-active network-address dns-resolve wireguard-active wireguard-handshake"
     "firewall:nft-active nft-policy-drop nft-no-testnet nft-localhost-root-only ports-listening"
     "ssh:ssh-host-keys ssh-service-active security-root-ssh-denied security-fail2ban bin-login-present"
     "mikopbx:quadlet-service mikopbx-service-active mikopbx-image-version mikopbx-cf-nonempty atc-ssh-port-23 atc-password-nonempty atc-secret-exists atc-no-plaintext-in-quadlet atc-env-in-container atc-stop-timeout pids-limit mikopbx-webui mikopbx-api-login"
@@ -33,9 +35,23 @@ desc_timezone-set() { echo "часовой пояс задан (/etc/timezone)";
 check_timezone-set() { [ -s /etc/timezone ]; }
 hint_timezone-set() { echo "timedatectl set-timezone Europe/Moscow"; }
 
-desc_timesyncd() { echo "синхронизация времени (timesyncd)"; }
+desc_timesyncd() { echo "служба timesyncd активна"; }
 check_timesyncd() { systemctl is-active --quiet systemd-timesyncd; }
 hint_timesyncd() { echo "systemctl enable --now systemd-timesyncd"; }
+
+desc_ntp-synchronized() { echo "часы синхронизированы с NTP"; }
+check_ntp-synchronized() {
+    command -v timedatectl >/dev/null 2>&1 || return 2
+    # systemd: NTPSynchronized=yes когда offset принят
+    local v
+    v=$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)
+    case "$v" in
+        yes) return 0 ;;
+        no) return 1 ;;
+        *) return 2 ;;
+    esac
+}
+hint_ntp-synchronized() { echo "timedatectl status; systemctl restart systemd-timesyncd"; }
 
 desc_apt-security-source() { echo "apt: security-источник подключён"; }
 check_apt-security-source() { grep -rh trixie-security /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null | grep -q .; }
@@ -89,16 +105,41 @@ check_lvm-layout() {
 hint_lvm-layout() { echo "lvs; findmnt / (источник должен быть /dev/mapper/vg0-root)"; }
 
 # Здоровье зеркала: только для raid1-LV (два диска). Linear/без vg0 — SKIP.
+# Деградация (изъятый диск) — WARN(3), не FAIL: полевой сценарий ожидаем.
 desc_lvm-mirror-health() { echo "LVM-зеркало целостно (оба лега raid1)"; }
 check_lvm-mirror-health() {
     command -v lvs >/dev/null 2>&1 || return 2
     lvs "${VG_NAME:-vg0}" >/dev/null 2>&1 || return 2
     lvs --noheadings -o lv_layout "${VG_NAME:-vg0}" 2>/dev/null | grep -q raid1 || return 2
-    # health_status непустой и не "-" — деградация (partial и т.п.)
-    ! lvs --noheadings -o lv_health_status "${VG_NAME:-vg0}" 2>/dev/null \
-        | grep -qE '[^[:space:]-]'
+    # health_status непустой и не "-" — деградация (partial и т.п.) → WARN
+    if lvs --noheadings -o lv_health_status "${VG_NAME:-vg0}" 2>/dev/null \
+            | grep -qE '[^[:space:]-]'; then
+        return 3
+    fi
+    return 0
 }
-hint_lvm-mirror-health() { echo "lvs -a -o +health_status; при умершем диске — runbook «Замена диска» (wiki)"; }
+hint_lvm-mirror-health() { echo "lvs -a -o +health_status; runbook Mirror-Disk-Replace (wiki)"; }
+
+desc_btrfs-device-stats() { echo "Btrfs device stats без ошибок I/O"; }
+check_btrfs-device-stats() {
+    command -v btrfs >/dev/null 2>&1 || return 2
+    findmnt -n -o FSTYPE / 2>/dev/null | grep -q btrfs || return 2
+    # -c: ненулевой exit при любых ненулевых счётчиках
+    btrfs device stats -c / >/dev/null 2>&1
+}
+hint_btrfs-device-stats() { echo "btrfs device stats /; проверьте диски/кабель"; }
+
+desc_efi-esp() { echo "ESP смонтирован, EFI-загрузчик на месте"; }
+check_efi-esp() {
+    [ -d /sys/firmware/efi ] || return 2
+    findmnt -n /boot/efi >/dev/null 2>&1 || return 1
+    # GRUB/shim на ESP (имена Debian)
+    local efi=/boot/efi/EFI
+    [ -d "$efi" ] || return 1
+    find "$efi" -type f \( -iname 'BOOTX64.EFI' -o -iname 'grubx64.efi' -o -iname 'shimx64.efi' \) \
+        2>/dev/null | grep -q .
+}
+hint_efi-esp() { echo "findmnt /boot/efi; ls /boot/efi/EFI/*/ ; efibootmgr -v"; }
 
 desc_disk-space() { echo "свободное место System и Data (>10%)"; }
 check_disk-space() {
@@ -122,7 +163,11 @@ check_network-address() { ip -4 -o addr show scope global | grep -q .; }
 hint_network-address() { echo "ip a; проверьте DHCP/статический адрес"; }
 
 desc_dns-resolve() { echo "DNS резолвит deb.debian.org"; }
-check_dns-resolve() { getent hosts deb.debian.org >/dev/null 2>&1; }
+check_dns-resolve() {
+    # офлайн / нет default route — SKIP, не ложный FAIL
+    ip route show default 2>/dev/null | grep -q . || return 2
+    getent hosts deb.debian.org >/dev/null 2>&1
+}
 hint_dns-resolve() { echo "resolvectl status; проверьте DNS-серверы"; }
 
 desc_wireguard-active() { echo "WireGuard (если включён): интерфейс поднят"; }
@@ -133,6 +178,34 @@ check_wireguard-active() {
     ip -4 -o addr show dev wg0 >/dev/null 2>&1
 }
 hint_wireguard-active() { echo "systemctl status wg-quick@wg0; wg show"; }
+
+desc_wireguard-handshake() { echo "WireGuard: свежий handshake с peer"; }
+check_wireguard-handshake() {
+    if ! systemctl is-enabled --quiet wg-quick@wg0.service 2>/dev/null; then
+        return 2
+    fi
+    command -v wg >/dev/null 2>&1 || return 2
+    ip link show wg0 >/dev/null 2>&1 || return 1
+    # latest-handshakes: pubkey\\ttimestamp; 0 = никогда
+    local line ts now
+    now=$(date +%s)
+    local any=0 fresh=0
+    while IFS=$'\t' read -r _ ts; do
+        [ -n "$ts" ] || continue
+        any=1
+        # handshake за последние 180 с — OK; был когда-то, но старый — WARN
+        if [ "$ts" -gt 0 ] 2>/dev/null; then
+            if [ $((now - ts)) -le 180 ]; then
+                fresh=1
+            fi
+        fi
+    done < <(wg show wg0 latest-handshakes 2>/dev/null)
+    [ "$any" = "1" ] || return 2   # нет peers
+    [ "$fresh" = "1" ] && return 0
+    # peer есть, handshake старый/нулевой
+    return 3
+}
+hint_wireguard-handshake() { echo "wg show; проверьте ключи/endpoint peer и UDP 51820"; }
 
 # ============ firewall ============
 desc_nft-active() { echo "nftables активен"; }
