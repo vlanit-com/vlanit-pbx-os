@@ -10,7 +10,7 @@ baseline.
 
 ## 1. Решение
 
-- `config/build.yaml` → `output.iso_baseline_mib` (от v1.4.1 ≈898) +
+- `config/build.yaml` → `output.iso_baseline_mib` (v1.4.2 slim ≈777) +
   `output.iso_size_margin_pct` (5).
 - `scripts/check-iso-size.sh` — порог `baseline×(1+margin/100)`, лог,
   топ членов ISO best-effort (7z/xorriso).

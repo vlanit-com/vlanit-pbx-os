@@ -4,6 +4,13 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.2 (2026-11-20)
+
+- Сборка: slim rootfs (locale `en*`/`ru*`, без doc/man; plymouth
+  `vlanit`+`text`+`details`; font `CyrSlav-DejaVu30x16`) на golden и
+  live; live-initrd `MODULES=list` + vlanit-live modules. ISO ≈777 MiB
+  (было ≈892). Issues #29–#32. Guard `iso_baseline_mib: 777`.
+
 ## 1.4.1 (2026-11-19)
 
 - Plymouth: логотип — основной элемент splash (animation/throbber +
