@@ -16,7 +16,8 @@ live-initrd с `MODULES=most` (~900 модулей). Аудит 1.2.8 про «e
 |---|---|
 | #29 | `slim-rootfs.sh`: locale только `en*`/`ru*` |
 | #30 | удаление `/usr/share/doc`, `/usr/share/man` (+info/lintian) |
-| #32 | plymouth: `vlanit`+`text`; fonts: `*CyrSlav-DejaVu30x16*` |
+| #32 | plymouth: `vlanit`+`text`+`details` (hook initramfs требует
+  `details`); fonts: `*CyrSlav-DejaVu30x16*` |
 | #31 | live: `MODULES=list` + hook vlanit-live + GPU modules-файл |
 
 Потребители: `10-golden-rootfs.sh`, `20-live-rootfs.sh`, `30-initramfs.sh`.

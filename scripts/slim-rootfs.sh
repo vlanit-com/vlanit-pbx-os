@@ -22,16 +22,17 @@ rm -rf "$ROOTFS/usr/share/doc" "$ROOTFS/usr/share/man"
 rm -rf "$ROOTFS/usr/share/info" "$ROOTFS/usr/share/lintian" 2>/dev/null || true
 log "удалены share/doc, share/man (+info/lintian)"
 
-# --- #32 plymouth: оставить vlanit + text (fallback) ---
+# --- #32 plymouth: vlanit + text + details ---
+# initramfs-tools/hooks/plymouth всегда копирует themes/details и text
+# (иначе mkinitramfs: cp: cannot stat '.../details').
 PLY="$ROOTFS/usr/share/plymouth/themes"
 if [ -d "$PLY" ]; then
     find "$PLY" -mindepth 1 -maxdepth 1 -type d \
-        ! -name vlanit ! -name text \
+        ! -name vlanit ! -name text ! -name details \
         -exec rm -rf {} +
-    # обломки .plymouth вне vlanit/text
     find "$PLY" -maxdepth 1 -type f -name '*.plymouth' ! -name 'default.plymouth' \
         -delete 2>/dev/null || true
-    log "plymouth themes: vlanit + text"
+    log "plymouth themes: vlanit + text + details"
 fi
 
 # --- #32 consolefonts: только CyrSlav-DejaVu30x16 (+ зависимости имени) ---

@@ -8,7 +8,7 @@ trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/usr/share/locale/"{de,en_US,ru_RU,fr} \
          "$TMP/usr/share/doc/foo" \
          "$TMP/usr/share/man/man1" \
-         "$TMP/usr/share/plymouth/themes/"{vlanit,spinner,text,glow} \
+         "$TMP/usr/share/plymouth/themes/"{vlanit,spinner,text,glow,details} \
          "$TMP/usr/share/consolefonts"
 touch "$TMP/usr/share/doc/foo/README" \
       "$TMP/usr/share/man/man1/ls.1" \
@@ -17,6 +17,7 @@ touch "$TMP/usr/share/doc/foo/README" \
       "$TMP/usr/share/plymouth/themes/vlanit/x" \
       "$TMP/usr/share/plymouth/themes/spinner/x" \
       "$TMP/usr/share/plymouth/themes/text/x" \
+      "$TMP/usr/share/plymouth/themes/details/x" \
       "$TMP/usr/share/plymouth/themes/glow/x"
 
 bash "$SCR" "$TMP"
@@ -29,6 +30,7 @@ bash "$SCR" "$TMP"
 [ ! -e "$TMP/usr/share/man/man1/ls.1" ]
 [ -d "$TMP/usr/share/plymouth/themes/vlanit" ]
 [ -d "$TMP/usr/share/plymouth/themes/text" ]
+[ -d "$TMP/usr/share/plymouth/themes/details" ]
 [ ! -d "$TMP/usr/share/plymouth/themes/spinner" ]
 [ ! -d "$TMP/usr/share/plymouth/themes/glow" ]
 [ -f "$TMP/usr/share/consolefonts/CyrSlav-DejaVu30x16.psf.gz" ]

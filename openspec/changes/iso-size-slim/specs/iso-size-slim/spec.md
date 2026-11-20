@@ -11,7 +11,8 @@
 The build MUST run a shared slim step on both golden and live rootfs after
 package install and Plymouth branding that: keeps only `en*`/`ru*` under
 `/usr/share/locale`; removes `/usr/share/doc` and `/usr/share/man`; keeps
-only Plymouth themes `vlanit` and `text`; keeps only console font files
+only Plymouth themes `vlanit`, `text`, and `details` (`details` required
+by initramfs-tools plymouth hook); keeps only console font files
 matching `CyrSlav-DejaVu30x16`.
 
 #### Scenario: Slim invoked from both rootfs scripts
