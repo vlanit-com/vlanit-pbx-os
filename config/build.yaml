@@ -1,7 +1,7 @@
 # Основной конфиг сборки VLANit PBX OS
 distro:
   name: VLANit PBX OS
-  version: "1.4.1"
+  version: "1.4.2"
   codename: trixie
   arch: amd64
 
@@ -32,8 +32,8 @@ provisioning:
   schema_version: 1
 
 output:
-  iso_name: VLANit-PBX-1.4.1-amd64.iso
+  iso_name: VLANit-PBX-1.4.2-amd64.iso
   # Guard размера ISO (scripts/check-iso-size.sh, CI build-iso). Baseline —
-  # v1.4.1 asset ≈897.3 MiB; fail если size > baseline×(1+margin/100).
-  iso_baseline_mib: 898
+  # v1.4.2 slim ≈777 MiB; fail если size > baseline×(1+margin/100).
+  iso_baseline_mib: 777
   iso_size_margin_pct: 5

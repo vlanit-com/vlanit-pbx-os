@@ -126,6 +126,8 @@ chroot "$ROOTFS" systemctl enable vlanit-installer.service 2>/dev/null || true
 # Plymouth: фирменная тема VLANit — splash на загрузке live-установщика
 # (тот же скрипт, что и в golden; installer.service ждёт plymouth-quit-wait)
 "$PROJECT_ROOT/scripts/install-plymouth-theme.sh" "$ROOTFS"
+# #29/#30/#32 — после тем и пакетов
+"$PROJECT_ROOT/scripts/slim-rootfs.sh" "$ROOTFS"
 
 # очистка
 rm -f "$ROOTFS/etc/resolv.conf" "$ROOTFS/etc/machine-id" "$ROOTFS/var/lib/dbus/machine-id"

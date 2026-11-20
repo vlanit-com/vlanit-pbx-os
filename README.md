@@ -25,7 +25,7 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 - **WireGuard VPN**: своя пара ключей при установке, wg0 с автозапуском,
   форвардинг, публичный ключ показывается на экране завершения.
 - **Брендинг ОС**: фон и цвета GRUB (логотип), Plymouth-заставка
-  (логотип по центру, 1.4.1 — `docs/branding.md`), os-release,
+  (логотип по центру, 1.4.1+ — `docs/branding.md`), os-release,
   консольные баннеры, шрифт консоли с кириллицей.
 
 - **Полное обновление при сборке (1.2.5)**: все пакеты golden/live
@@ -45,7 +45,7 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 `docs/specs/mirror-two-disk.md`, ADR-0004. Проверки: `vlanit-doctor`
 (`lvm-layout`, `lvm-mirror-health`).
 
-**Установщик (1.4.1).** Primary — HTML + `netsurf-fb` (локальный HTTP);
+**Установщик (1.4.2).** Primary — HTML + `netsurf-fb` (локальный HTTP);
 реестр экранов `installer/screens.yaml`, брендинг
 `installer/branding/<profile>/` (`VLANIT_BRANDING`). Fallback — Cursive
 TUI (`vlanit-tui`), затем `dialog` в фирменной теме
@@ -169,7 +169,7 @@ bash scripts/sign-release.sh   # dist/*.iso.sha256 -> .asc
 # с подписанными контрольными суммами (идея #11, см. ниже «Правило релизов»)
 
 # запись на USB (требует root, ДЕСТРУКТИВНО)
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.1-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.2-amd64.iso /dev/sdX
 # другие способы (dd, GNOME Disks, KDE ISO Image Writer, Rufus, balenaEtcher,
 # macOS dd, Ventoy) — docs/installation.md, раздел «Создание загрузочной флэшки»
 
@@ -180,8 +180,8 @@ make clean          # очистка build/{rootfs,live,iso-staging}, dist
 
 | Путь | Назначение |
 |---|---|
-| `dist/VLANit-PBX-1.4.1-amd64.iso` | итоговый загрузочный ISO (UEFI) |
-| `dist/VLANit-PBX-1.4.1-amd64.iso.sha256` | контрольная сумма |
+| `dist/VLANit-PBX-1.4.2-amd64.iso` | итоговый загрузочный ISO (UEFI) |
+| `dist/VLANit-PBX-1.4.2-amd64.iso.sha256` | контрольная сумма |
 | `build/payload/mikopbx-*.tar.zst` | экспортированный образ MikoPBX (+sha256) |
 | `build/payload/golden.tar.zst` | Golden Image устанавливаемой системы |
 | `build/logs/` | журналы шагов сборки |

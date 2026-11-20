@@ -1,0 +1,9 @@
+# Доп. модули для live-initrd при MODULES=list (#31).
+# Storage/FS/USB — live/initramfs-hook-vlanit-live (manual_add_modules).
+# GPU — ранний Plymouth на live (как golden etc-initramfs-tools-modules).
+ast
+i915
+amdgpu
+radeon
+bochs
+virtio-gpu
