@@ -14,5 +14,8 @@
 - `15-lvs-console.png`, `16-doctor.png` — реальный QEMU-консоль (1.3.3)
 - `01`–`05` — иллюстрации типового вывода команд (не замена стенда)
 
+Диагностика: CLI `vlanit-doctor` / на консоли с FB — `vlanit-doctor --gui`
+(HTML+netsurf; #56). Руководство + скрины: [`docs/doctor-gui.md`](doctor-gui.md).
+
 Спеки: `docs/specs/mirror-two-disk.md`, `docs/specs/backup-usb.md`,
 `docs/specs/parity-matrix.md`.

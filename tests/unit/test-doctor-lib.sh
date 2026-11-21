@@ -78,4 +78,58 @@ check_btrfs-root; rc=$?
 unset -f findmnt
 [ "$rc" = "0" ] && ok "btrfs-root -> OK" || bad "btrfs-root: rc=$rc"
 
+# 8. lvm-mirror-health: деградация → WARN(3)
+lvs() {
+    case "$*" in
+        *lv_layout*) echo " raid1" ;;
+        *lv_health_status*) echo " partial" ;;
+        *) echo "  root" ;;
+    esac
+    return 0
+}
+command() { [ "$1" = -v ] && [ "$2" = lvs ]; }
+check_lvm-mirror-health; rc=$?
+unset -f lvs command
+[ "$rc" = "3" ] && ok "lvm-mirror degraded -> WARN" || bad "lvm-mirror WARN: rc=$rc"
+
+# 9. ntp-synchronized
+timedatectl() { echo "yes"; }
+check_ntp-synchronized; rc=$?
+[ "$rc" = "0" ] && ok "ntp yes -> OK" || bad "ntp OK: rc=$rc"
+# no + timesyncd active → WARN
+timedatectl() { echo "no"; }
+systemctl() { return 0; }
+check_ntp-synchronized; rc=$?
+[ "$rc" = "3" ] && ok "ntp no+timesyncd -> WARN" || bad "ntp WARN: rc=$rc"
+# no + timesyncd down → FAIL
+systemctl() { return 1; }
+check_ntp-synchronized; rc=$?
+unset -f timedatectl systemctl
+[ "$rc" = "1" ] && ok "ntp no+down -> FAIL" || bad "ntp FAIL: rc=$rc"
+
+# 10. dns без default route → SKIP
+ip() { return 1; }
+check_dns-resolve; rc=$?
+unset -f ip
+[ "$rc" = "2" ] && ok "dns no-route -> SKIP" || bad "dns SKIP: rc=$rc"
+
+# 11. wireguard-handshake без peers → SKIP (wg enabled)
+systemctl() { return 0; }
+ip() { return 0; }
+wg() { :; }
+check_wireguard-handshake; rc=$?
+unset -f systemctl ip wg
+[ "$rc" = "2" ] && ok "wg handshake no peers -> SKIP" || bad "wg handshake: rc=$rc"
+
+# 12. apt-upgradable: pending security → WARN(3); offline → SKIP
+getent() { return 1; }
+check_apt-upgradable; rc=$?
+[ "$rc" = "2" ] && ok "apt-upgradable offline -> SKIP" || bad "apt-upgradable SKIP: rc=$rc"
+getent() { return 0; }
+apt-get() { return 0; }
+apt() { echo "libgpgme11t64/stable-security 1.24.2-3+deb13u1 amd64 [upgradable from: 1.24.2-3]"; }
+check_apt-upgradable; rc=$?
+unset -f getent apt-get apt
+[ "$rc" = "3" ] && ok "apt-upgradable pending -> WARN" || bad "apt-upgradable WARN: rc=$rc"
+
 exit $fail

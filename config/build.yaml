@@ -34,6 +34,7 @@ provisioning:
 output:
   iso_name: VLANit-PBX-1.4.2-amd64.iso
   # Guard размера ISO (scripts/check-iso-size.sh, CI build-iso). Baseline —
-  # v1.4.2 slim ≈777 MiB; fail если size > baseline×(1+margin/100).
-  iso_baseline_mib: 777
+  # v1.4.2 + doctor GUI/netsurf; mmdebstrap+kernel 6.12.117 ≈849 MiB.
+  # fail если size > baseline×(1+margin/100).
+  iso_baseline_mib: 849
   iso_size_margin_pct: 5

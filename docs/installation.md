@@ -159,6 +159,26 @@ MikoPBX занимает до 3–6 минут.
 
 ## 5. Диагностика после установки
 
+Сводный контроль — **`vlanit-doctor`** (read-only; те же проверки, что у
+тест-агента). На консоли с монитором удобнее GUI:
+
+```bash
+sudo vlanit-doctor                 # CLI: OK / FAIL / WARN / SKIP
+sudo vlanit-doctor --fix-hints     # команды исправления под FAIL/WARN
+sudo vlanit-doctor --gui           # HTML + framebuffer (как установщик)
+# или: sudo vlanit-doctor-gui
+```
+
+- Код `--quiet`: **0** = нет FAIL (WARN допустим, напр. degraded зеркало).
+- GUI: сводка → группы; «Только FAIL/WARN»; без `/dev/fb0` — подсказка CLI.
+- Галерея экранов: [`docs/doctor-gui.md`](doctor-gui.md).
+
+![Сводка doctor](doctor-gui/shots/01-overview.png)
+
+![Только FAIL/WARN](doctor-gui/shots/02-problems.png)
+
+Дополнительно вручную:
+
 ```bash
 systemctl status mikopbx          # состояние контейнера
 podman logs mikopbx               # журнал MikoPBX
