@@ -36,7 +36,9 @@ vlanit-doctor --json
 4. **Только FAIL/WARN** — фильтр проблем.
 
 Статусы: **OK** · **FAIL** · **WARN** (напр. degraded LVM mirror) · **SKIP**.
-GUI ничего не меняет в системе.
+Проверки read-only. Если на USB есть `vlanit-update-*.tar`+`.asc` —
+кнопка **Обновить АТС** → `vlanit-update --gui` (нет FB → CLI на консоли).
+Confirm YES только в мастере обновления (issue #58).
 
 Скрины ниже — mock (типичный FAIL+WARN), не живой бокс.
 

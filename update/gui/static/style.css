@@ -1,0 +1,39 @@
+/* vlanit-update GUI — те же токены, что doctor */
+:root {
+  --bg: #0b1220;
+  --fg: #e8eef7;
+  --muted: #9aa8bc;
+  --card: #141e2e;
+  --ok: #3dd68c;
+  --warn: #f5a524;
+  --fail: #f07178;
+  --accent: #5b9fd4;
+  --border: #243247;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 1.25rem 1.5rem 2rem;
+  font-family: "DejaVu Sans", "Liberation Sans", sans-serif;
+  background: var(--bg); color: var(--fg); font-size: 18px; line-height: 1.45;
+}
+h1 { font-size: 1.5rem; margin: 0 0 0.75rem; }
+h2 { font-size: 1.2rem; margin: 1rem 0 0.5rem; }
+.muted { color: var(--muted); }
+.err { color: var(--fail); }
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 1rem 1.1rem; margin: 0.75rem 0;
+}
+.btn {
+  display: inline-block; margin: 0.35rem 0.5rem 0.35rem 0;
+  padding: 0.55rem 1rem; background: var(--accent); color: #061018;
+  text-decoration: none; border-radius: 4px; font-weight: 600;
+  border: none; font-size: 1rem; cursor: pointer;
+}
+.btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+.btn.danger { background: var(--fail); color: #1a0505; }
+.actions { margin-top: 1.25rem; }
+ul.pkgs { list-style: none; padding: 0; }
+ul.pkgs li { margin: 0.4rem 0; }
+code { font-size: 0.9em; }
+.progress { color: var(--accent); }

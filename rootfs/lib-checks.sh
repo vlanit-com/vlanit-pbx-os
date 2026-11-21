@@ -23,7 +23,7 @@ CHECK_GROUPS=(
     "ssh:ssh-host-keys ssh-service-active security-root-ssh-denied security-fail2ban bin-login-present"
     "mikopbx:quadlet-service mikopbx-service-active mikopbx-image-version mikopbx-cf-nonempty atc-ssh-port-23 atc-password-nonempty atc-secret-exists atc-no-plaintext-in-quadlet atc-env-in-container atc-stop-timeout pids-limit mikopbx-webui mikopbx-api-login"
     "logs:journal-persistent journal-last-boot"
-    "updates:apt-upgradable pre-update-snapshot"
+    "updates:apt-upgradable pre-update-snapshot mikopbx-image-pin ota-package-present ota-last-result"
 )
 
 # ============ system ============
@@ -380,3 +380,64 @@ check_pre-update-snapshot() {
     /opt/vlanit/vlanit-snapshot list 2>/dev/null | grep -q 'pre-update' || return 2
 }
 hint_pre-update-snapshot() { echo "/opt/vlanit/vlanit-snapshot create manual"; }
+
+desc_mikopbx-image-pin() { echo "quadlet Image= совпадает с pin build.yaml"; }
+check_mikopbx-image-pin() {
+    local cfg want got
+    cfg="$(find /var/lib/vlanit/payload /opt/vlanit/payload -maxdepth 1 -name build.yaml 2>/dev/null | head -1)"
+    [ -n "$cfg" ] || return 2
+    want="$(sed -n 's/^  local_name: //p' "$cfg" | head -1 | tr -d '"')"
+    [ -n "$want" ] || return 2
+    [ -f /etc/containers/systemd/mikopbx.container ] || return 2
+    got="$(sed -n 's/^Image=//p' /etc/containers/systemd/mikopbx.container | head -1)"
+    [ -n "$got" ] || return 1
+    [ "$got" = "$want" ]
+}
+hint_mikopbx-image-pin() { echo "vlanit-update / проверьте Image= в mikopbx.container"; }
+
+# Кандидаты OTA на USB (тот же поиск, что vlanit-update без аргументов).
+# Печатает пути в stdout; rc: 0=есть, 2=нет USB/пакетов.
+ota_list_usb_packages() {
+    local m f
+    _ota_mnts=()
+    mapfile -t _ota_mnts < <(lsblk -n -o TRAN,MOUNTPOINT 2>/dev/null | awk '$1=="usb" && $2!=""{print $2}') || true
+    [ "${#_ota_mnts[@]}" -ge 1 ] || return 2
+    local found=0
+    for m in "${_ota_mnts[@]}"; do
+        while read -r f; do
+            [ -f "$f" ] && [ -f "$f.asc" ] || continue
+            printf '%s\n' "$f"
+            found=1
+        done < <(find "$m" -maxdepth 2 -name 'vlanit-update-*.tar' 2>/dev/null || true)
+    done
+    [ "$found" = "1" ] && return 0
+    return 2
+}
+
+desc_ota-package-present() { echo "на USB есть пакет vlanit-update (подпись)"; }
+check_ota-package-present() {
+    ota_list_usb_packages >/dev/null
+    case $? in
+        0) return 0 ;;
+        *) return 2 ;;
+    esac
+}
+hint_ota-package-present() { echo "подключите USB с vlanit-update-*.tar + .asc; vlanit-update --gui"; }
+
+desc_ota-last-result() { echo "последний vlanit-update завершился успешно"; }
+check_ota-last-result() {
+    local log=/var/log/vlanit-update.log
+    [ -s "$log" ] || return 2
+    # последняя итоговая строка OK / ОШИБКА / ПРЕДУПРЕЖДЕНИЕ
+    if tail -n 80 "$log" | grep -q 'OK: обновление АТС завершено'; then
+        return 0
+    fi
+    if tail -n 80 "$log" | grep -qiE 'vlanit-update: ОШИБКА|GPG-подпись.*НЕВЕРНА'; then
+        return 1
+    fi
+    if tail -n 80 "$log" | grep -q 'ПРЕДУПРЕЖДЕНИЕ: MikoPBX не стал готов'; then
+        return 3
+    fi
+    return 2
+}
+hint_ota-last-result() { echo "tail /var/log/vlanit-update.log; vlanit-rollback при необходимости"; }
