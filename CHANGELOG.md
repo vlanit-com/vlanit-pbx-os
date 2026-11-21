@@ -4,6 +4,14 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.3 (2026-11-21)
+
+- Doctor GUI: HTML + `netsurf-fb` поверх `vlanit-doctor` (сводка,
+  фильтр FAIL/WARN, группы); pending NTP/apt → WARN. Issue #56.
+- OTA GUI: `vlanit-update --gui` (пакет → YES → apply); кнопка
+  «Обновить АТС» в doctor при USB-пакете → handoff / CLI fallback.
+  Стиль как у doctor. Issue #58.
+
 ## 1.4.2 (2026-11-20)
 
 - Сборка: slim rootfs (locale `en*`/`ru*`, без doc/man; plymouth

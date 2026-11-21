@@ -12,7 +12,7 @@
 проверяет смонтированные разделы и требует явного подтверждения.
 
 ```bash
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.2-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.3-amd64.iso /dev/sdX
 ```
 
 (`/dev/sdX` — ваша флэшка, например `/dev/sdb`; точное имя смотрите
@@ -21,7 +21,7 @@ sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.2-amd64.iso /dev/sdX
 Эквивалент вручную:
 
 ```bash
-sudo dd if=VLANit-PBX-1.4.2-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+sudo dd if=VLANit-PBX-1.4.3-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
 sync
 ```
 
@@ -46,7 +46,7 @@ sync
 # узнать идентификатор флэшки, например disk4
 diskutil list
 diskutil unmountDisk /dev/disk4
-sudo dd if=VLANit-PBX-1.4.2-amd64.iso of=/dev/rdisk4 bs=4m
+sudo dd if=VLANit-PBX-1.4.3-amd64.iso of=/dev/rdisk4 bs=4m
 diskutil eject /dev/disk4
 ```
 
@@ -65,11 +65,11 @@ diskutil eject /dev/disk4
 ```bash
 # 1) подпись контрольной суммы (публичный ключ — в репозитории, rootfs/etc-vlanit-release.pub)
 gpg --no-default-keyring --keyring rootfs/etc-vlanit-release.pub \
-    --verify dist/VLANit-PBX-1.4.2-amd64.iso.sha256.asc
+    --verify dist/VLANit-PBX-1.4.3-amd64.iso.sha256.asc
 # ожидается: «Действительная подпись VLANit PBX OS Release»
 
 # 2) целостность образа
-sha256sum -c dist/VLANit-PBX-1.4.2-amd64.iso.sha256   # сверить образ до записи
+sha256sum -c dist/VLANit-PBX-1.4.3-amd64.iso.sha256   # сверить образ до записи
 # после записи — сравнить первые блоки (Linux):
 sudo head -c 1G /dev/sdX | sha256sum   # должно совпасть с началом образа
 ```
