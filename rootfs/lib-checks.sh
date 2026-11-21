@@ -42,12 +42,19 @@ hint_timesyncd() { echo "systemctl enable --now systemd-timesyncd"; }
 desc_ntp-synchronized() { echo "часы синхронизированы с NTP"; }
 check_ntp-synchronized() {
     command -v timedatectl >/dev/null 2>&1 || return 2
-    # systemd: NTPSynchronized=yes когда offset принят
+    # systemd: NTPSynchronized=yes когда offset принят.
+    # Сразу после boot часто ещё no при живом timesyncd — WARN, не FAIL
+    # (иначе vlanit-doctor --quiet красный на свежей установке / QEMU).
     local v
     v=$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)
     case "$v" in
         yes) return 0 ;;
-        no) return 1 ;;
+        no)
+            if systemctl is-active --quiet systemd-timesyncd 2>/dev/null; then
+                return 3
+            fi
+            return 1
+            ;;
         *) return 2 ;;
     esac
 }
@@ -356,7 +363,13 @@ check_apt-upgradable() {
     # требует свежего индекса; при отсутствии сети — SKIP
     if ! getent hosts deb.debian.org >/dev/null 2>&1; then return 2; fi
     apt-get update -qq >/dev/null 2>&1
-    [ "$(apt list --upgradable 2>/dev/null | grep -c security)" -eq 0 ]
+    # Свежая установка часто видит pending security до прохода
+    # unattended-upgrades — WARN, не FAIL (иначе doctor --quiet красный
+    # на QEMU/поле сразу после install).
+    local n
+    n="$(apt list --upgradable 2>/dev/null | grep -c security || true)"
+    [ "${n:-0}" -eq 0 ] && return 0
+    return 3
 }
 hint_apt-upgradable() { echo "apt-get upgrade; unattended-upgrades"; }
 

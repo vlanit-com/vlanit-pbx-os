@@ -16,7 +16,7 @@
 
 - [x] 3.1 поставить `netsurf-fb` (+ deps) в golden (`10-golden-rootfs.sh`)
 - [x] 3.2 установить doctor GUI в `/opt/vlanit/doctor/`
-- [ ] 3.3 сверить размер ISO с `iso_baseline_mib`; bump baseline если нужно
+- [x] 3.3 сверить размер ISO с `iso_baseline_mib`; bump baseline → 849
 
 ## 4. Tests / verify
 
