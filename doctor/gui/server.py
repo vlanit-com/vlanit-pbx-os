@@ -18,11 +18,87 @@ TEMPLATES = ROOT / "templates"
 PORT = int(os.environ.get("VLANIT_DOCTOR_PORT", "8766"))
 DOCTOR_CMD = os.environ.get("VLANIT_DOCTOR_CMD", "vlanit-doctor --json")
 DONE_FILE = Path(os.environ.get("VLANIT_DOCTOR_DONE", "/run/vlanit/doctor-gui-done"))
+UPDATE_BIN = os.environ.get("VLANIT_UPDATE_BIN", "vlanit-update")
+HANDOFF_FLAG = Path(os.environ.get("VLANIT_DOCTOR_HANDOFF", "/run/vlanit/doctor-update-handoff"))
 
 _cache_lock = threading.Lock()
 _cache: dict | None = None
 _cache_err: str | None = None
 _running = False
+
+
+def _ota_packages() -> list[str]:
+    """USB-кандидаты; пустой список → кнопки нет.
+    Override: VLANIT_OTA_PACKAGES=path1:path2 (для скринов/тестов)."""
+    override = os.environ.get("VLANIT_OTA_PACKAGES", "").strip()
+    if override:
+        return [p for p in override.split(":") if p and Path(p).is_file()]
+    try:
+        out = subprocess.check_output(
+            [
+                "bash",
+                "-c",
+                "source /opt/vlanit/lib/checks.sh 2>/dev/null; "
+                "command -v ota_list_usb_packages >/dev/null && ota_list_usb_packages",
+            ],
+            text=True,
+            timeout=15,
+        )
+        return [ln.strip() for ln in out.splitlines() if ln.strip()]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _handoff_update(pkg: str) -> tuple[str, str]:
+    """Popen vlanit-update --gui. Doctor не шлёт YES.
+    Returns (status, detail): gui|cli|err."""
+    import time
+
+    HANDOFF_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    HANDOFF_FLAG.write_text(pkg + "\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["VLANIT_UPDATE_PKG"] = pkg
+    try:
+        proc = subprocess.Popen(
+            [UPDATE_BIN, "--gui", pkg],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            start_new_session=True,
+        )
+        time.sleep(1.2)
+        rc = proc.poll()
+        if rc is None:
+            return "gui", "update GUI запущен"
+        err = ""
+        try:
+            _, err = proc.communicate(timeout=0.2)
+        except Exception:  # noqa: BLE001
+            pass
+        if rc == 2:
+            tty = "/dev/tty1" if Path("/dev/tty1").exists() else "/dev/console"
+            try:
+                with open(tty, "a", encoding="utf-8") as tf:
+                    tf.write(
+                        f"\nvlanit-doctor: GUI недоступен — CLI: vlanit-update {pkg}\n"
+                    )
+                subprocess.Popen(
+                    [UPDATE_BIN, pkg],
+                    stdin=open(tty, "r", encoding="utf-8", errors="ignore"),
+                    stdout=open(tty, "w", encoding="utf-8", errors="ignore"),
+                    stderr=subprocess.STDOUT,
+                    env=env,
+                    start_new_session=True,
+                )
+            except OSError:
+                pass
+            return "cli", (err or "нет /dev/fb0 / netsurf-fb").strip()
+        if rc == 0:
+            return "gui", "update GUI завершён"
+        return "err", f"vlanit-update --gui exit {rc}: {err}"
+    except Exception as exc:  # noqa: BLE001
+        return "err", str(exc)
 
 
 def _run_doctor() -> tuple[dict | None, str | None]:
@@ -171,8 +247,25 @@ def page_overview(data: dict, *, problems_only: bool = False) -> bytes:
         cards = [_check_card(c) for c in checks]
         detail = f"<h2>Проблемы</h2>{''.join(cards) if cards else '<p class=\"muted\">Нет FAIL/WARN</p>'}"
 
+    pkgs = _ota_packages()
+    update_btn = ""
+    ota_hint = ""
+    if pkgs:
+        # один пакет — сразу handoff; несколько — первая страница update GUI
+        pkg_q = html.escape(pkgs[0])
+        update_btn = (
+            f'<a class="btn" href="/action/update?pkg={pkg_q}">Обновить АТС</a>'
+            if len(pkgs) == 1
+            else '<a class="btn" href="/action/update">Обновить АТС</a>'
+        )
+        extra = f" (+{len(pkgs) - 1})" if len(pkgs) > 1 else ""
+        ota_hint = (
+            f'<p class="ota-hint">Пакет OTA: '
+            f'<code>{html.escape(Path(pkgs[0]).name)}</code>{extra}</p>'
+        )
+
     body = f"""
-<p class="muted">Хост: {html.escape(str(host))} · read-only · те же проверки, что CLI</p>
+<p class="muted">Хост: {html.escape(str(host))} · проверки read-only · OTA через vlanit-update</p>
 <div class="card result-{cls}">
   <h2>Итог: {html.escape(str(result))}</h2>
   <p>{ok_n} OK · {fail_n} FAIL · {warn_n} WARN · {skip_n} SKIP</p>
@@ -182,9 +275,11 @@ def page_overview(data: dict, *, problems_only: bool = False) -> bytes:
   {"".join(rows)}
 </table>
 {detail}
+{ota_hint}
 <p class="actions">
-  <a class="btn" href="/?refresh=1">Обновить</a>
+  <a class="btn secondary" href="/?refresh=1">Перепроверить</a>
   {filter_btn}
+  {update_btn}
   <a class="btn secondary" href="/quit">Выход</a>
 </p>
 """
@@ -270,6 +365,49 @@ class Handler(BaseHTTPRequestHandler):
                     '<p class="muted">Можно закрыть. CLI: <code>vlanit-doctor</code></p>',
                 ),
             )
+            return
+
+        if path == "/action/update":
+            pkgs = _ota_packages()
+            pkg = (qs.get("pkg") or [""])[0]
+            if not pkg:
+                pkg = pkgs[0] if pkgs else ""
+            if not pkg or not Path(pkg).is_file():
+                self._send(
+                    200,
+                    render_layout(
+                        "doctor · update",
+                        '<p class="err">Пакет не найден.</p>'
+                        '<p class="actions"><a class="btn" href="/">Назад</a></p>',
+                    ),
+                )
+                return
+            status, detail = _handoff_update(pkg)
+            if status == "gui":
+                # освободить FB для update GUI
+                DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                DONE_FILE.write_text("handoff\n", encoding="utf-8")
+                body = (
+                    f'<p>Запущен <code>vlanit-update --gui</code>.</p>'
+                    f'<p class="muted">{html.escape(detail)}</p>'
+                    f'<p class="muted">Пакет: <code>{html.escape(pkg)}</code></p>'
+                    '<p class="actions"><a class="btn" href="/quit">Закрыть doctor</a></p>'
+                )
+            elif status == "cli":
+                body = (
+                    '<p class="err">GUI обновления недоступен — fallback CLI на консоли.</p>'
+                    f'<p class="muted">{html.escape(detail)}</p>'
+                    f'<p>Выполните при необходимости: '
+                    f'<code>vlanit-update {html.escape(pkg)}</code></p>'
+                    '<p class="actions"><a class="btn" href="/">Назад</a></p>'
+                )
+            else:
+                body = (
+                    f'<p class="err">Handoff: {html.escape(detail)}</p>'
+                    f'<p><code>vlanit-update {html.escape(pkg)}</code></p>'
+                    '<p class="actions"><a class="btn" href="/">Назад</a></p>'
+                )
+            self._send(200, render_layout("doctor · update", body))
             return
 
         refresh = qs.get("refresh", ["0"])[0] in ("1", "true", "yes")

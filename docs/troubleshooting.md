@@ -7,7 +7,7 @@ sudo vlanit-doctor --fix-hints    # CLI
 sudo vlanit-doctor --gui          # консоль с монитором
 ```
 
-Руководство и скрины: [`docs/doctor-gui.md`](doctor-gui.md).  
+Руководства: [`doctor-gui.md`](doctor-gui.md), OTA [`update-gui.md`](update-gui.md).  
 `--quiet` = 0 при только WARN (degraded зеркало — ожидаемо).
 
 ## Не загружается с USB
@@ -79,13 +79,12 @@ ls /var/lib/vlanit/atc-password-broken 2>/dev/null
 
 ## OTA-обновления и откат
 
-- `vlanit-update [пакет]` — сканирует USB (или `--online`), проверяет
-  GPG-подпись, совместимость версий и SHA256, делает снапшот `pre-update`,
-  применяет обновление, проверяет готовность MikoPBX.
-- `vlanit-rollback [снапшот]` — возвращает систему (включая данные АТС)
-  к состоянию снапшота, перезагружает устройство.
-- Пакет обновления собирается `scripts/build-update-package.sh`
-  (нужен приватный ключ релиза, хранится вне репозитория).
+- GUI: `vlanit-update --gui` — пошагово [`docs/update-gui.md`](update-gui.md).
+  Из doctor (USB-пакет): кнопка **Обновить АТС**.
+- `vlanit-update [пакет]` — CLI: USB / `--online`, GPG, compat, SHA256,
+  снапшот `pre-update`, apply, health MikoPBX.
+- `vlanit-rollback [снапшот]` — откат + reboot.
+- Пакет: `scripts/build-update-package.sh` (ключ релиза вне репо).
 - Журналы: `/var/log/vlanit-update.log`, `/var/log/vlanit-backup.log`.
 
 ## Бэкап на USB

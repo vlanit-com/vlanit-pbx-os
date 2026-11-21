@@ -3,25 +3,42 @@
 #
 # vlanit-update [путь-к-пакету.tar]
 # vlanit-update --online
+# vlanit-update --gui [путь-к-пакету.tar]   # HTML+netsurf-fb (issue #58)
 #
 # Пакет: tar с manifest.json + образом АТС (*.tar.zst) + detached-подписью *.asc.
 # Доверие: gpgv с ключом /etc/vlanit/release.pub.
 set -Eeuo pipefail
+
+PKG=""
+ONLINE="no"
+WANT_GUI="no"
+for a in "$@"; do
+    case "$a" in
+        --online) ONLINE="yes" ;;
+        --gui) WANT_GUI="yes" ;;
+        -h|--help)
+            grep '^#' "$0" | head -10 | cut -c3-
+            exit 0
+            ;;
+        *) PKG="$a" ;;
+    esac
+done
+
+if [ "$WANT_GUI" = "yes" ]; then
+    GUI_LAUNCH="${VLANIT_UPDATE_GUI:-/opt/vlanit/update/launch-gui.sh}"
+    [ -x "$GUI_LAUNCH" ] || {
+        echo "vlanit-update: GUI не установлен ($GUI_LAUNCH) — CLI без --gui" >&2
+        exit 2
+    }
+    export VLANIT_UPDATE_PKG="${PKG:-}"
+    exec "$GUI_LAUNCH" ${PKG:+"$PKG"}
+fi
 
 LOG=/var/log/vlanit-update.log
 exec >> >(tee -a "$LOG") 2>&1
 
 log()  { echo "[$(date '+%H:%M:%S')] $*"; }
 die()  { echo "vlanit-update: ОШИБКА: $*" >&2; exit 2; }
-
-PKG=""
-ONLINE="no"
-for a in "$@"; do
-    case "$a" in
-        --online) ONLINE="yes" ;;
-        *) PKG="$a" ;;
-    esac
-done
 
 PUBKEY=/etc/vlanit/release.pub
 [ -f "$PUBKEY" ] || die "ключ релиза не найден: $PUBKEY"

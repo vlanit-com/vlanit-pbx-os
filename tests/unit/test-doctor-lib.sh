@@ -132,4 +132,22 @@ check_apt-upgradable; rc=$?
 unset -f getent apt-get apt
 [ "$rc" = "3" ] && ok "apt-upgradable pending -> WARN" || bad "apt-upgradable WARN: rc=$rc"
 
+# 13. ota-package-present: нет USB → SKIP
+lsblk() { echo ""; }
+check_ota-package-present; rc=$?
+unset -f lsblk
+[ "$rc" = "2" ] && ok "ota-package-present no-usb -> SKIP" || bad "ota-package SKIP: rc=$rc"
+
+# 14. ota-last-result: нет лога → SKIP
+[ ! -s /var/log/vlanit-update.log ] && {
+  check_ota-last-result; rc=$?
+  [ "$rc" = "2" ] && ok "ota-last-result no-log -> SKIP" || bad "ota-last SKIP: rc=$rc"
+}
+
+# 15. контракт: новые checks в CHECK_GROUPS
+declare -F check_mikopbx-image-pin >/dev/null && ok "check_mikopbx-image-pin существует" \
+  || bad "нет check_mikopbx-image-pin"
+echo "${CHECK_GROUPS[*]}" | grep -q ota-package-present \
+  && ok "ota-package-present в CHECK_GROUPS" || bad "ota-package не в группах"
+
 exit $fail

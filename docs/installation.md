@@ -171,11 +171,12 @@ sudo vlanit-doctor --gui           # HTML + framebuffer (как установщ
 
 - Код `--quiet`: **0** = нет FAIL (WARN допустим, напр. degraded зеркало).
 - GUI: сводка → группы; «Только FAIL/WARN»; без `/dev/fb0` — подсказка CLI.
-- Галерея экранов: [`docs/doctor-gui.md`](doctor-gui.md).
+- USB с пакетом OTA → кнопка **Обновить АТС** → [`vlanit-update --gui`](update-gui.md).
+- Галереи: [`doctor-gui.md`](doctor-gui.md), [`update-gui.md`](update-gui.md).
 
 ![Сводка doctor](doctor-gui/shots/01-overview.png)
 
-![Только FAIL/WARN](doctor-gui/shots/02-problems.png)
+![Сводка + Обновить АТС](doctor-gui/shots/05-overview-update.png)
 
 Дополнительно вручную:
 

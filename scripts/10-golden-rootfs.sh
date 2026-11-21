@@ -157,6 +157,18 @@ if [ -f "$PROJECT_ROOT/installer/branding/default/logo.png" ]; then
     install -D -m 0644 "$PROJECT_ROOT/installer/branding/default/logo.png" \
         "$ROOTFS/opt/vlanit/doctor/static/logo.png"
 fi
+# OTA GUI (issue #58): HTTP + netsurf-fb, handoff из doctor
+install -d -m 0755 "$ROOTFS/opt/vlanit/update/static"
+install -D -m 0755 "$PROJECT_ROOT/update/gui/server.py" \
+    "$ROOTFS/opt/vlanit/update/server.py"
+install -D -m 0755 "$PROJECT_ROOT/update/gui/launch-gui.sh" \
+    "$ROOTFS/opt/vlanit/update/launch-gui.sh"
+install -D -m 0644 "$PROJECT_ROOT/update/gui/static/style.css" \
+    "$ROOTFS/opt/vlanit/update/static/style.css"
+if [ -f "$PROJECT_ROOT/installer/branding/default/logo.png" ]; then
+    install -D -m 0644 "$PROJECT_ROOT/installer/branding/default/logo.png" \
+        "$ROOTFS/opt/vlanit/update/static/logo.png"
+fi
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-release.pub" \
     "$ROOTFS/etc/vlanit/release.pub"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/etc-vlanit-update.conf" \
