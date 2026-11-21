@@ -63,16 +63,26 @@ chmod +x "$WORKDIR/fake-doctor.sh"
 export VLANIT_OTA_PACKAGES="$PKG"
 export VLANIT_UPDATE_BIN="$WORKDIR/fake-update-cli"
 export VLANIT_UPDATE_PORT="$PORT_U"
-export VLANIT_UPDATE_STATIC="$PROJECT_ROOT/update/gui/static"
+export VLANIT_UPDATE_STATIC="$WORKDIR/update-static"
 export VLANIT_UPDATE_DONE="$WORKDIR/update-gui-done"
 export VLANIT_UPDATE_STATE="$WORKDIR/update-state"
 export VLANIT_UPDATE_PKG=""
+mkdir -p "$VLANIT_UPDATE_STATIC"
+cp -a "$PROJECT_ROOT/update/gui/static/." "$VLANIT_UPDATE_STATIC/"
+if [ -f "$PROJECT_ROOT/installer/branding/default/logo.png" ]; then
+  cp -f "$PROJECT_ROOT/installer/branding/default/logo.png" "$VLANIT_UPDATE_STATIC/logo.png"
+fi
 
 python3 "$PROJECT_ROOT/update/gui/server.py" &
 
 export VLANIT_DOCTOR_CMD="$WORKDIR/fake-doctor.sh"
 export VLANIT_DOCTOR_PORT="$PORT_D"
-export VLANIT_DOCTOR_STATIC="$PROJECT_ROOT/doctor/gui/static"
+export VLANIT_DOCTOR_STATIC="$WORKDIR/doctor-static"
+mkdir -p "$VLANIT_DOCTOR_STATIC"
+cp -a "$PROJECT_ROOT/doctor/gui/static/." "$VLANIT_DOCTOR_STATIC/"
+if [ -f "$PROJECT_ROOT/installer/branding/default/logo.png" ]; then
+  cp -f "$PROJECT_ROOT/installer/branding/default/logo.png" "$VLANIT_DOCTOR_STATIC/logo.png"
+fi
 export VLANIT_DOCTOR_DONE="$WORKDIR/doctor-gui-done"
 export VLANIT_DOCTOR_HANDOFF="$WORKDIR/doctor-update-handoff"
 export VLANIT_UPDATE_BIN="$WORKDIR/fake-update"

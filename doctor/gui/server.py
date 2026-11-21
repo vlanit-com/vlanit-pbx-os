@@ -249,6 +249,7 @@ def page_overview(data: dict, *, problems_only: bool = False) -> bytes:
 
     pkgs = _ota_packages()
     update_btn = ""
+    ota_hint = ""
     if pkgs:
         # один пакет — сразу handoff; несколько — первая страница update GUI
         pkg_q = html.escape(pkgs[0])
@@ -257,10 +258,10 @@ def page_overview(data: dict, *, problems_only: bool = False) -> bytes:
             if len(pkgs) == 1
             else '<a class="btn" href="/action/update">Обновить АТС</a>'
         )
-        update_btn += (
-            f'<span class="muted"> · пакет: {html.escape(Path(pkgs[0]).name)}'
-            + (f" (+{len(pkgs)-1})" if len(pkgs) > 1 else "")
-            + "</span>"
+        extra = f" (+{len(pkgs) - 1})" if len(pkgs) > 1 else ""
+        ota_hint = (
+            f'<p class="ota-hint">Пакет OTA: '
+            f'<code>{html.escape(Path(pkgs[0]).name)}</code>{extra}</p>'
         )
 
     body = f"""
@@ -274,6 +275,7 @@ def page_overview(data: dict, *, problems_only: bool = False) -> bytes:
   {"".join(rows)}
 </table>
 {detail}
+{ota_hint}
 <p class="actions">
   <a class="btn secondary" href="/?refresh=1">Перепроверить</a>
   {filter_btn}

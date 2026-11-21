@@ -1,6 +1,8 @@
 # Руководство: vlanit-update GUI
 
 Мастер обновления образа MikoPBX на консоли (HTML + `netsurf-fb`).
+Тот же визуальный стиль, что doctor: чёрный фон, золото `#e6b800`,
+кнопки primary/secondary, logo из branding.
 Issue [#58](https://github.com/vlanit-com/vlanit-pbx-os/issues/58).
 Спека: [`docs/specs/vlanit-update-gui.md`](specs/vlanit-update-gui.md).
 Связано: doctor GUI [`docs/doctor-gui.md`](doctor-gui.md), pin/bump

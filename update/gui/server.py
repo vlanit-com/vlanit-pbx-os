@@ -24,17 +24,25 @@ _apply_rc: int | None = None
 _apply_log: str = ""
 
 
-def render(title: str, body: str) -> bytes:
-    css = "/static/style.css"
+def render(title: str, body: str, *, refresh_sec: int | None = None) -> bytes:
+    refresh_meta = (
+        f'<meta http-equiv="refresh" content="{refresh_sec}">' if refresh_sec else ""
+    )
+    logo = ""
+    if (STATIC / "logo.png").is_file():
+        logo = '<img class="brand" src="/static/logo.png" alt="VLANit">'
     doc = f"""<!DOCTYPE html>
 <html lang="ru"><head>
 <meta charset="utf-8">
-<meta http-equiv="refresh" content="3">
+{refresh_meta}
 <title>{html.escape(title)}</title>
-<link rel="stylesheet" href="{css}">
+<link rel="stylesheet" href="/static/style.css">
 </head><body>
-<h1>VLANit обновление АТС</h1>
+<div class="wrap">
+{logo}
+<h1>{html.escape(title)}</h1>
 {body}
+</div>
 </body></html>
 """
     return doc.encode("utf-8")
@@ -74,20 +82,23 @@ def page_pick(pkgs: list[str]) -> bytes:
 </p>
 <p class="muted">CLI: <code>vlanit-update</code></p>
 """
-        return render("update · нет пакета", body)
+        return render("VLANit обновление АТС", body)
     items = []
     for p in pkgs:
         items.append(
-            f'<li class="card"><a class="btn" href="/confirm?pkg={html.escape(p)}">'
-            f"{html.escape(Path(p).name)}</a>"
-            f'<div class="muted">{html.escape(p)}</div></li>'
+            f'<li class="card">'
+            f'<p class="pkg-name">{html.escape(Path(p).name)}</p>'
+            f'<p class="muted"><code>{html.escape(p)}</code></p>'
+            f'<p class="actions">'
+            f'<a class="btn" href="/confirm?pkg={html.escape(p)}">Выбрать</a>'
+            f"</p></li>"
         )
     body = f"""
 <p class="muted">Выберите пакет обновления (GPG-подпись обязательна).</p>
 <ul class="pkgs">{"".join(items)}</ul>
 <p class="actions"><a class="btn secondary" href="/quit">Выход</a></p>
 """
-    return render("update · пакет", body)
+    return render("VLANit обновление АТС", body)
 
 
 def page_confirm(pkg: str) -> bytes:
@@ -99,7 +110,8 @@ def page_confirm(pkg: str) -> bytes:
     body = f"""
 <div class="card">
   <h2>Сводка</h2>
-  <p>Пакет: <code>{html.escape(pkg)}</code></p>
+  <p>Пакет: <code>{html.escape(Path(pkg).name)}</code></p>
+  <p class="muted">Путь: <code>{html.escape(pkg)}</code></p>
   <p>Объём: {html.escape(size)}</p>
   <p>Будет создан снапшот <code>pre-update</code>, затем импорт образа АТС.</p>
   <p class="muted">Откат: <code>vlanit-rollback</code></p>
@@ -109,7 +121,7 @@ def page_confirm(pkg: str) -> bytes:
   <a class="btn secondary" href="/">Отмена</a>
 </p>
 """
-    return render("update · confirm", body)
+    return render("VLANit обновление АТС · подтверждение", body)
 
 
 def page_apply(pkg: str) -> bytes:
@@ -144,11 +156,11 @@ def page_apply(pkg: str) -> bytes:
 
             threading.Thread(target=_run, daemon=True).start()
             body = f"""
-<p class="progress">Запуск обновления…</p>
-<p class="muted">{html.escape(pkg)}</p>
+<p class="hint">Запуск обновления…</p>
+<p class="muted"><code>{html.escape(Path(pkg).name)}</code></p>
 <p class="actions"><a class="btn" href="/status">Статус</a></p>
 """
-            return render("update · apply", body)
+            return render("VLANit обновление АТС · запуск", body, refresh_sec=2)
 
     return page_status()
 
@@ -166,30 +178,32 @@ def page_status() -> bytes:
         except OSError:
             pass
         body = f"""
-<p class="progress">Идёт обновление (снапшот → import → restart → health)…</p>
+<p class="hint">Идёт обновление (снапшот → import → restart → health)…</p>
 <pre class="card muted">{html.escape(log_tail or "…")}</pre>
 <p class="actions"><a class="btn" href="/status">Обновить статус</a></p>
 """
-        return render("update · progress", body)
+        return render(
+            "VLANit обновление АТС · прогресс", body, refresh_sec=2
+        )
     if rc == 0:
         body = f"""
-<div class="card"><h2>OK</h2>
+<div class="card result-ok"><h2>OK</h2>
 <p>Обновление АТС завершено.</p>
 <p class="muted">Откат: <code>vlanit-rollback</code></p></div>
 <pre class="card muted">{html.escape(log_tail[-1500:])}</pre>
 <p class="actions"><a class="btn" href="/quit">Выход</a></p>
 """
-        return render("update · OK", body)
+        return render("VLANit обновление АТС · готово", body)
     body = f"""
-<div class="card"><h2 class="err">Ошибка (код {rc})</h2>
-<p>См. лог. CLI: <code>tail /var/log/vlanit-update.log</code></p></div>
+<div class="card result-fail"><h2>Ошибка (код {rc})</h2>
+<p class="err">См. лог. CLI: <code>tail /var/log/vlanit-update.log</code></p></div>
 <pre class="card muted">{html.escape(log_tail[-2000:])}</pre>
 <p class="actions">
   <a class="btn" href="/">Сначала</a>
   <a class="btn secondary" href="/quit">Выход</a>
 </p>
 """
-    return render("update · FAIL", body)
+    return render("VLANit обновление АТС · ошибка", body)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -218,7 +232,10 @@ class Handler(BaseHTTPRequestHandler):
             if not fpath.is_file():
                 self._send(404, b"missing")
                 return
-            self._send(200, fpath.read_bytes(), "text/css; charset=utf-8")
+            ctype = (
+                "image/png" if fpath.suffix == ".png" else "text/css; charset=utf-8"
+            )
+            self._send(200, fpath.read_bytes(), ctype)
             return
 
         if path == "/quit":
@@ -227,7 +244,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(
                 200,
                 render(
-                    "update · выход",
+                    "VLANit обновление АТС",
                     '<p class="muted">Можно закрыть. CLI: <code>vlanit-update</code></p>',
                 ),
             )
