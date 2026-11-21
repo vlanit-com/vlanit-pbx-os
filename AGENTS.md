@@ -86,7 +86,8 @@ git-ветку или одноразовый статус задачи.
   `docs/doctor-gui.md` + `docs/doctor-gui/shots/`; установка
   `docs/installation.md`.
 - Doctor: CLI `rootfs/vlanit-doctor` + GUI `doctor/gui/`
-  (`vlanit-doctor --gui`); проверки в `rootfs/lib-checks.sh`.
+  (`vlanit-doctor --gui`); проверки в `rootfs/lib-checks.sh`;
+  pending NTP / apt-security → WARN (не FAIL).
 - ISO slim: `scripts/slim-rootfs.sh` (locale/doc/plymouth; из golden/live
   rootfs hooks).
 - Plymouth без железа: QEMU burst PPM / `virtio-vga` —

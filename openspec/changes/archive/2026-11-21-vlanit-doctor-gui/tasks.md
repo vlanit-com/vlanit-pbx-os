@@ -22,7 +22,8 @@
 
 - [x] 4.1 unit: JSON fixture → HTML (группы, OK/FAIL/SKIP, hint)
 - [x] 4.2 unit/smoke launcher no-fb
-- [ ] 4.3 `make iso` + QEMU doctor — отдельная сессия (не блокер спеки)
+- [x] 4.3 `make iso` + QEMU T1/T2: agent `vlanit-doctor` PASS
+      (FB GUI shot — опционально, не блокер)
 
 ## 5. Ops docs
 
