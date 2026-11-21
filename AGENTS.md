@@ -83,11 +83,12 @@ git-ветку или одноразовый статус задачи.
 - TUI-сборка: `scripts/build-tui.sh` (Docker `rust:1.85-bookworm`) →
   `installer/bin/vlanit-tui`.
 - Галереи UI: installer `docs/gui-installer.md` + `shots/`; doctor
-  `docs/doctor-gui.md` + `docs/doctor-gui/shots/`; установка
-  `docs/installation.md`.
+  `docs/doctor-gui.md` + `shots/`; OTA `docs/update-gui.md` + `shots/`;
+  установка `docs/installation.md`.
 - Doctor: CLI `rootfs/vlanit-doctor` + GUI `doctor/gui/`
   (`vlanit-doctor --gui`); проверки в `rootfs/lib-checks.sh`;
-  pending NTP / apt-security → WARN (не FAIL).
+  pending NTP / apt-security → WARN (не FAIL); кнопка OTA →
+  `vlanit-update --gui` (#58).
 - ISO slim: `scripts/slim-rootfs.sh` (locale/doc/plymouth; из golden/live
   rootfs hooks).
 - Plymouth без железа: QEMU burst PPM / `virtio-vga` —

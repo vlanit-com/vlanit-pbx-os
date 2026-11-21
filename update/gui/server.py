@@ -41,6 +41,9 @@ def render(title: str, body: str) -> bytes:
 
 
 def list_usb_packages() -> list[str]:
+    override = os.environ.get("VLANIT_OTA_PACKAGES", "").strip()
+    if override:
+        return [p for p in override.split(":") if p and Path(p).is_file()]
     env_pkg = os.environ.get("VLANIT_UPDATE_PKG", "").strip()
     if env_pkg and Path(env_pkg).is_file():
         return [env_pkg]

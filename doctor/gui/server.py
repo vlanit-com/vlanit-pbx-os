@@ -28,7 +28,11 @@ _running = False
 
 
 def _ota_packages() -> list[str]:
-    """USB-кандидаты; пустой список → кнопки нет."""
+    """USB-кандидаты; пустой список → кнопки нет.
+    Override: VLANIT_OTA_PACKAGES=path1:path2 (для скринов/тестов)."""
+    override = os.environ.get("VLANIT_OTA_PACKAGES", "").strip()
+    if override:
+        return [p for p in override.split(":") if p and Path(p).is_file()]
     try:
         out = subprocess.check_output(
             [

@@ -5,6 +5,10 @@
 Спека: [`docs/specs/vlanit-doctor-gui.md`](specs/vlanit-doctor-gui.md).
 CLI as-built: [`docs/specs/1.2.8-vlanit-doctor.md`](specs/1.2.8-vlanit-doctor.md).
 Установка / после firstboot: [`docs/installation.md`](installation.md) §5.
+OTA с консоли: [`docs/update-gui.md`](update-gui.md) (issue #58).
+
+Скрины — mock (`scripts/shot-update-gui.sh` для 05–06; ранее — doctor
+fixtures). На боксе тот же UI, данные живые.
 
 ## Запуск
 
@@ -16,8 +20,7 @@ sudo vlanit-doctor --gui
 sudo vlanit-doctor-gui
 ```
 
-Без framebuffer процесс завершится с подсказкой использовать CLI.
-Для стенда QEMU: `VLANIT_FB_SURFACE=sdl`.
+Без framebuffer — exit ≠0 и hint CLI. Стенд QEMU: `VLANIT_FB_SURFACE=sdl`.
 
 CLI (SSH / скрипты):
 
@@ -34,13 +37,15 @@ vlanit-doctor --json
 2. **Сводка** — итог OK / WARN / FAIL, счётчики по группам.
 3. **Группа** — каждая проверка + hint при FAIL/WARN.
 4. **Только FAIL/WARN** — фильтр проблем.
+5. **Обновить АТС** — только если на USB есть `vlanit-update-*.tar`+`.asc`
+   → handoff в `vlanit-update --gui` (нет FB → CLI на консоли).
+   Confirm YES **не** в doctor — только в мастере обновления.
 
-Статусы: **OK** · **FAIL** · **WARN** (напр. degraded LVM mirror) · **SKIP**.
-Проверки read-only. Если на USB есть `vlanit-update-*.tar`+`.asc` —
-кнопка **Обновить АТС** → `vlanit-update --gui` (нет FB → CLI на консоли).
-Confirm YES только в мастере обновления (issue #58).
+Статусы: **OK** · **FAIL** · **WARN** · **SKIP**.
+Проверки read-only (`--json` / `--quiet` не запускают OTA).
 
-Скрины ниже — mock (типичный FAIL+WARN), не живой бокс.
+Группа **updates** (в т.ч.): `apt-upgradable`, `pre-update-snapshot`,
+`mikopbx-image-pin`, `ota-package-present`, `ota-last-result`.
 
 ---
 
@@ -63,3 +68,16 @@ Confirm YES только в мастере обновления (issue #58).
 ## Группа system (FAIL NTP)
 
 ![system](doctor-gui/shots/04-group-system.png)
+
+## Сводка с кнопкой «Обновить АТС»
+
+Появляется, когда найден USB-пакет OTA. Рядом имя пакета.
+
+![Сводка + Обновить АТС](doctor-gui/shots/05-overview-update.png)
+
+## Handoff → vlanit-update --gui
+
+После нажатия doctor сообщает о запуске мастера и предлагает закрыться
+(освободить framebuffer). Дальше — шаги в [`update-gui.md`](update-gui.md).
+
+![Handoff](doctor-gui/shots/06-handoff.png)

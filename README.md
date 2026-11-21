@@ -15,7 +15,7 @@ MikoPBX в контейнере + Btrfs со снапшотами + предна
 
 ## Возможности 1.2
 
-- **OTA-обновления**: `vlanit-update` — подписанные GPG пакеты (USB или
+- **OTA-обновления**: `vlanit-update` / `vlanit-update --gui` — подписанные GPG пакеты (USB или
   `--online`), снапшот перед применением, health-check MikoPBX;
   `vlanit-rollback` — откат системы из Btrfs-снапшота с перезагрузкой.
 - **Безопасность**: unattended-upgrades (security-источники с 1.2.3),
@@ -134,8 +134,10 @@ vlanit-doctor --gui        # HTML + framebuffer на консоли (#56)
 
 Проверки: `/opt/vlanit/lib/checks.sh` (общий с тест-агентом).  
 Руководство + скрины: [`docs/doctor-gui.md`](docs/doctor-gui.md),  
+OTA GUI: [`docs/update-gui.md`](docs/update-gui.md),  
 после установки: [`docs/installation.md`](docs/installation.md) §5.  
-Спеки: `docs/specs/1.2.8-vlanit-doctor.md`, `docs/specs/vlanit-doctor-gui.md`.
+Спеки: `docs/specs/1.2.8-vlanit-doctor.md`, `docs/specs/vlanit-doctor-gui.md`,
+`docs/specs/vlanit-update-gui.md`.
 
 ## Требования к сборочной машине
 
