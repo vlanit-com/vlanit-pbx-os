@@ -2,25 +2,58 @@
 # scripts/pull-mikopbx.sh — выгрузка официального образа MikoPBX в payload (на хосте).
 # Использует docker только как средство скачивания/экспорта на этапе сборки.
 # В целевой ОС Docker отсутствует — используется Podman.
+# Источник: config/build.yaml → mikopbx.{image,digest,tag} (issue #12).
 set -Eeuo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PAYLOAD="$PROJECT_ROOT/build/payload"
-IMAGE="mikopbx/mikopbx:2026.6.99-amd64"
-DIGEST="sha256:6489e2a72ee6c670383ce7f61e21ad419880193ecad964d93e91596256c1c4b0"
-TAR_NAME="mikopbx-2026.6.99-amd64.tar"
+CFG="$PROJECT_ROOT/config/build.yaml"
+
+yaml_get() {
+    # yaml_get <file> <dotted.path>
+    python3 - "$1" "$2" <<'PY'
+import sys
+try:
+    import yaml
+except ImportError:
+    # fallback без PyYAML: простой sed по ключу последнего сегмента
+    path, key = sys.argv[1], sys.argv[2].split(".")[-1]
+    import re
+    text = open(path, encoding="utf-8").read()
+    m = re.search(rf'(?m)^\s*{re.escape(key)}:\s*["\']?([^"\'\n#]+)', text)
+    if not m:
+        sys.exit(f"ключ {sys.argv[2]} не найден в {path}")
+    print(m.group(1).strip().strip('"').strip("'"))
+    raise SystemExit(0)
+data = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+cur = data
+for part in sys.argv[2].split("."):
+    cur = cur[part]
+print(cur)
+PY
+}
+
+IMAGE="$(yaml_get "$CFG" mikopbx.image)"
+DIGEST="$(yaml_get "$CFG" mikopbx.digest)"
+TAG="$(yaml_get "$CFG" mikopbx.tag)"
+TAR_NAME="mikopbx-${TAG}.tar"
+
+[ -n "$IMAGE" ] && [ -n "$DIGEST" ] && [ -n "$TAG" ] || {
+    echo "ОШИБКА: mikopbx.image/digest/tag пусты в $CFG" >&2
+    exit 1
+}
 
 mkdir -p "$PAYLOAD"
 cd "$PAYLOAD"
 
-echo "Pull $IMAGE"
+echo "Pull $IMAGE (ожидаемый digest $DIGEST)"
 docker pull "$IMAGE"
 
 # Проверка digest после pull (docker обновляет digest при pull)
 actual="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE" | sed 's/.*@//')"
 if [ "$actual" != "$DIGEST" ]; then
     echo "ОШИБКА: digest образа изменился: $actual (ожидался $DIGEST)" >&2
-    echo "Обновите config/build.yaml и config/release-manifest.yaml после проверки." >&2
+    echo "Обновите config/build.yaml и config/release-manifest.yaml (см. docs/specs/mikopbx-update.md)." >&2
     exit 1
 fi
 

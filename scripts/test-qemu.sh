@@ -18,6 +18,7 @@ cd "$PROJECT_ROOT"
 # версия — из config/build.yaml (тот же источник, что имя ISO в 50-iso.sh):
 # литералы здесь уже давали рассинхрон при бампе (аудит версий 1.3.2).
 VERSION="$(sed -n 's/^  version: //p' config/build.yaml | head -1 | tr -d '"')"
+MIKOPBX_TAG="$(sed -n 's/^  tag: //p' config/build.yaml | head -1 | tr -d '"')"
 ISO="dist/VLANit-PBX-$VERSION-amd64.iso"
 STAGING="build/iso-staging"
 EFI_IMG="build/grub/efi.img"
@@ -314,13 +315,19 @@ make_usb_update() {
 # Подготовка тестового пакета обновления (тот же образ, новый тег test1)
 build_test_package() {
     local outdir="$1"
+    local base="mikopbx-${MIKOPBX_TAG}.tar.zst"
+    # test1-тег: вставить -test1 перед -amd64 (или в конец)
+    local test_tar
+    case "$MIKOPBX_TAG" in
+        *-amd64) test_tar="mikopbx-${MIKOPBX_TAG%-amd64}-test1-amd64.tar.zst" ;;
+        *)       test_tar="mikopbx-${MIKOPBX_TAG}-test1.tar.zst" ;;
+    esac
     mkdir -p "$outdir"
-    cp build/payload/mikopbx-2026.6.99-amd64.tar.zst \
-        "$outdir/mikopbx-2026.6.99-test1-amd64.tar.zst"
+    cp "build/payload/$base" "$outdir/$test_tar"
     # TMPDIR в TESTDIR: сборочный stage build-update-package.sh — mktemp,
     # а /tmp — переполняемый tmpfs хоста (OTA FAIL по ENOSPC 16.11).
     TMPDIR="$TESTDIR" GNUPGHOME="$HOME/.vlanit-release-gnupg" bash scripts/build-update-package.sh \
-        "$outdir/mikopbx-2026.6.99-test1-amd64.tar.zst" "$outdir" "1.2.0" >/dev/null \
+        "$outdir/$test_tar" "$outdir" "1.2.0" >/dev/null \
         || die "не удалось собрать пакет обновления"
     ls "$outdir"/vlanit-update-*.tar
 }
@@ -422,11 +429,11 @@ test_errors() {
 
     # 7c: повреждённый payload (несоответствие SHA256)
     local name="t7c"
-    echo "0000000000000000000000000000000000000000000000000000000000000000  mikopbx-2026.6.99-amd64.tar.zst" \
+    echo "0000000000000000000000000000000000000000000000000000000000000000  mikopbx-${MIKOPBX_TAG}.tar.zst" \
         > "$TESTDIR/t7_bad.sha256"
     make_test_iso "$TESTDIR/t7c.iso" \
         /autoinstall.yaml=tests/integration/autoinstall.yaml \
-        /payload/mikopbx-2026.6.99-amd64.tar.zst.sha256="$TESTDIR/t7_bad.sha256"
+        "/payload/mikopbx-${MIKOPBX_TAG}.tar.zst.sha256=$TESTDIR/t7_bad.sha256"
     rm -f "$TESTDIR/${name}_serial.log"
     run_qemu "$name" "$TESTDIR/t7c.iso" "-"
     if wait_serial "$TESTDIR/${name}_serial.log" "VLANIT_INSTALL_FAILED" 600; then

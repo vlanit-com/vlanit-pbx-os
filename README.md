@@ -154,7 +154,8 @@ vlanit-doctor --gui        # HTML + framebuffer на консоли (#56)
 ## Команды
 
 ```bash
-# подготовка payload (один раз, нужен docker)
+# подготовка payload (один раз, нужен docker; pin — config/build.yaml)
+# bump MikoPBX: docs/specs/mikopbx-update.md (#12)
 bash scripts/pull-mikopbx.sh
 
 # сборка ISO

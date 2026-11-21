@@ -64,10 +64,14 @@ install_run_stages() {
     }
 
     verify_payload() {
+        local mtag mtar
+        mtag="$(yaml_get "$PAYLOAD/build.yaml" mikopbx.tag "")"
+        [ -n "$mtag" ] || die "mikopbx.tag не найден в payload/build.yaml"
+        mtar="mikopbx-${mtag}.tar.zst"
         ( cd "$PAYLOAD" && sha256sum -c golden.tar.zst.sha256 ) || \
             die "контрольная сумма golden.tar.zst не соответствует манифесту"
-        ( cd "$PAYLOAD" && sha256sum -c mikopbx-2026.6.99-amd64.tar.zst.sha256 ) || \
-            die "контрольная сумма mikopbx.tar.zst не соответствует манифесту"
+        ( cd "$PAYLOAD" && sha256sum -c "${mtar}.sha256" ) || \
+            die "контрольная сумма $mtar не соответствует манифесту"
         log "payload корректен"
     }
     stage_partitions() {
@@ -145,11 +149,14 @@ install_finish_text() {
     [ -n "$podman_v" ] || podman_v="(в образе)"
     local ver
     ver="$(yaml_get "$PAYLOAD/release-manifest.yaml" distro.version 1.0)"
+    local mver
+    mver="$(yaml_get "$PAYLOAD/release-manifest.yaml" mikopbx.version "")"
+    [ -n "$mver" ] || mver="$(yaml_get "$PAYLOAD/build.yaml" mikopbx.tag "?")"
     local text
     text="VLANit PBX OS $ver
 Debian: $(yaml_get "$PAYLOAD/release-manifest.yaml" debian.version 13)
 Podman: $podman_v
-MikoPBX: 2026.6.99
+MikoPBX: $mver
 Hostname: $SYS_HOSTNAME
 IP-адрес: $IP_ADDR
 Статус MikoPBX: будет запущена автоматически при первой загрузке

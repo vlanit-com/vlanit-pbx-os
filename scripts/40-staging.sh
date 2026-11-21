@@ -18,15 +18,21 @@ mkdir -p "$STAGING/payload" "$STAGING/boot/grub"
 log() { printf '[staging] %s\n' "$*"; }
 
 log "копирование payload"
+MIKOPBX_TAG="$(sed -n 's/^  tag: //p' "$PROJECT_ROOT/config/build.yaml" | head -1 | tr -d '"')"
+[ -n "$MIKOPBX_TAG" ] || { echo "[staging] ОШИБКА: mikopbx.tag не найден в build.yaml" >&2; exit 1; }
+MIKOPBX_TAR="mikopbx-${MIKOPBX_TAG}.tar.zst"
 cp -a "$PAYLOAD_SRC/golden.tar.zst" "$PAYLOAD_SRC/golden.tar.zst.sha256" "$STAGING/payload/"
-cp -a "$PAYLOAD_SRC/mikopbx-2026.6.99-amd64.tar.zst" "$PAYLOAD_SRC/mikopbx-2026.6.99-amd64.tar.zst.sha256" "$STAGING/payload/"
+cp -a "$PAYLOAD_SRC/$MIKOPBX_TAR" "$PAYLOAD_SRC/${MIKOPBX_TAR}.sha256" "$STAGING/payload/"
+# совместимость: symlink mikopbx.tar.zst (как в pull-mikopbx.sh)
+ln -sfn "$MIKOPBX_TAR" "$STAGING/payload/mikopbx.tar.zst"
+ln -sfn "${MIKOPBX_TAR}.sha256" "$STAGING/payload/mikopbx.tar.zst.sha256"
 
 # версии/defaults для установщика
 cp -a "$PROJECT_ROOT/config/build.yaml" "$STAGING/payload/build.yaml"
 cp -a "$PROJECT_ROOT/config/release-manifest.yaml" "$STAGING/payload/release-manifest.yaml"
 
 GOLDEN_SHA="$(awk '{print $1}' "$STAGING/payload/golden.tar.zst.sha256")"
-MIKOPBX_SHA="$(awk '{print $1}' "$STAGING/payload/mikopbx-2026.6.99-amd64.tar.zst.sha256")"
+MIKOPBX_SHA="$(awk '{print $1}' "$STAGING/payload/${MIKOPBX_TAR}.sha256")"
 FACTS="$BUILD_DIR/facts.json"
 DEBIAN_VERSION="$(jq -r .debian_version "$FACTS")"
 KERNEL_VERSION="$(jq -r .kernel_version "$FACTS")"

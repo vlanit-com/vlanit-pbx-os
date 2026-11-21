@@ -7,7 +7,7 @@ After=network-online.target vlanit-atc-secret.service
 Wants=network-online.target
 
 [Container]
-Image=localhost/vlanit/mikopbx:2026.6.99-amd64
+Image=localhost/vlanit/mikopbx:2026.9.5-amd64
 ContainerName=mikopbx
 HostName=mikopbx
 Network=host

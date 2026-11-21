@@ -13,9 +13,9 @@ debian:
 arch: amd64
 podman: null              # версия Podman в Golden Image
 mikopbx:
-  image: mikopbx/mikopbx:2026.6.99-amd64
-  version: "2026.6.99"
-  digest: "sha256:6489e2a72ee6c670383ce7f61e21ad419880193ecad964d93e91596256c1c4b0"
+  image: mikopbx/mikopbx:2026.9.5-amd64
+  version: "2026.9.5"
+  digest: "sha256:6326b3502a77484c97a5c7df18f9e73b57275373100117a00de23824f0e87337"
 payload:
   golden_tar: null        # sha256 golden.tar.zst
   mikopbx_tar: null       # sha256 mikopbx.tar.zst

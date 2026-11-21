@@ -182,6 +182,11 @@ configure_target_mikopbx() {
     case "$pids_limit"   in ''|*[!0-9]*) pids_limit=8192  ;; esac
     sed -i -E "s/^StopTimeout=.*/StopTimeout=$stop_timeout/" "$quadlet"
     sed -i -E "s/^PidsLimit=.*/PidsLimit=$pids_limit/" "$quadlet"
+    # Image pin из payload/build.yaml (#12) — не литерал в шаблоне golden
+    local img
+    img="$(yaml_get "$PAYLOAD/build.yaml" mikopbx.local_name "")"
+    [ -n "$img" ] || die "mikopbx.local_name не найден в payload/build.yaml"
+    sed -i -E "s|^Image=.*|Image=$img|" "$quadlet"
     python3 - "$quadlet" "$pbx_name" "$admin_login" "$admin_pass" "$tz" <<'PYEOF'
 import sys
 sys.path.insert(0, "/opt/vlanit/provisioning")  # live-среда: общий модуль
@@ -261,16 +266,22 @@ mount_chroot_fs() {
 
 # Импорт образа MikoPBX в rootful Podman целевой системы (офлайн)
 import_mikopbx_image() {
-    local target_image="localhost/vlanit/mikopbx:2026.6.99-amd64"
+    local tag tar_name target_image
+    tag="$(yaml_get "$PAYLOAD/build.yaml" mikopbx.tag "")"
+    [ -n "$tag" ] || die "mikopbx.tag не найден в payload/build.yaml"
+    tar_name="mikopbx-${tag}.tar.zst"
+    target_image="$(yaml_get "$PAYLOAD/build.yaml" mikopbx.local_name "localhost/vlanit/mikopbx:${tag}")"
     mkdir -p "$SYS_MNT/var/lib/vlanit/payload"
-    log "копирование payload MikoPBX в целевую систему"
-    cp "$PAYLOAD/mikopbx-2026.6.99-amd64.tar.zst" "$SYS_MNT/var/lib/vlanit/payload/"
+    log "копирование payload MikoPBX в целевую систему ($tar_name)"
+    cp "$PAYLOAD/$tar_name" "$SYS_MNT/var/lib/vlanit/payload/"
+    # build.yaml нужен firstboot (тот же pin тега)
+    cp "$PAYLOAD/build.yaml" "$SYS_MNT/var/lib/vlanit/payload/build.yaml"
 
     log "импорт образа MikoPBX в Podman (chroot)"
     mount_chroot_fs
     chroot "$SYS_MNT" /bin/sh -c "
         if ! podman image exists '$target_image'; then
-            zstd -dc /var/lib/vlanit/payload/mikopbx-2026.6.99-amd64.tar.zst | podman load
+            zstd -dc /var/lib/vlanit/payload/$tar_name | podman load
             src_tag=\$(podman images --format '{{.Repository}}:{{.Tag}}' | grep mikopbx | head -1)
             [ -n \"\$src_tag\" ] && podman tag \"\$src_tag\" '$target_image'
         fi

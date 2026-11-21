@@ -4,12 +4,20 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## Unreleased
+
+- MikoPBX: pin `2026.9.5-amd64` (было `2026.6.99`); единый источник
+  `config/build.yaml` → pull/staging/deploy/firstboot. Регламент bump:
+  `docs/specs/mikopbx-update.md` (#12).
+
 ## 1.4.2 (2026-11-20)
 
 - Сборка: slim rootfs (locale `en*`/`ru*`, без doc/man; plymouth
   `vlanit`+`text`+`details`; font `CyrSlav-DejaVu30x16`) на golden и
   live; live-initrd `MODULES=list` + vlanit-live modules. ISO ≈777 MiB
   (было ≈892). Issues #29–#32. Guard `iso_baseline_mib: 777`.
+- Doctor GUI (`vlanit-doctor --gui`) + WARN для NTP/apt-security pending
+  (#56); baseline ISO ≈849 MiB.
 
 ## 1.4.1 (2026-11-19)
 

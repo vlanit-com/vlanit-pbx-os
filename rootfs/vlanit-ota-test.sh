@@ -60,9 +60,11 @@ case "$PHASE" in
         sleep 5; reboot -f
         ;;
     *)
-        # фаза 3: после отката — проверка возврата версии
+        # фаза 3: после отката — проверка возврата версии (pin из build.yaml #12)
         sleep 90   # дать контейнеру подняться
-        if grep -q "2026.6.99-amd64" /etc/containers/systemd/mikopbx.container \
+        want="$(sed -n 's/^  local_name: //p' /var/lib/vlanit/payload/build.yaml 2>/dev/null | head -1 | tr -d '"')"
+        [ -n "$want" ] || want="$(sed -n 's/^Image=//p' /etc/containers/systemd/mikopbx.container | head -1)"
+        if [ -n "$want" ] && grep -q "Image=${want}" /etc/containers/systemd/mikopbx.container \
            && ! grep -q "test1" /etc/containers/systemd/mikopbx.container; then
             ok "version-reverted"
         else

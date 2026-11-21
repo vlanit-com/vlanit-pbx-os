@@ -163,7 +163,7 @@ cat > "$RUNDIR/finish.txt" <<'EOF'
 VLANit PBX OS 1.4.0
 Debian: 13
 Podman: (в образе)
-MikoPBX: 2026.6.99
+MikoPBX: 2026.9.5
 Hostname: vlanit-pbx
 IP-адрес: 192.168.1.50
 Статус MikoPBX: будет запущена автоматически при первой загрузке

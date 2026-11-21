@@ -105,5 +105,7 @@ ls /var/lib/vlanit/atc-password-broken 2>/dev/null
 
 - Журналы шагов: `build/logs/*.log`.
 - `make clean` затрагивает только `build/rootfs|live|iso-staging` и `dist`.
-- Обновление MikoPBX: `scripts/pull-mikopbx.sh` (проверит digest),
-  затем `make iso`.
+- Обновление MikoPBX (регламент #12): `docs/specs/mikopbx-update.md`.
+  Кратко: bump `mikopbx.*` в `config/build.yaml` + `release-manifest.yaml`
+  → `bash scripts/pull-mikopbx.sh` (verify digest) → `make iso` → QEMU Т1–Т2
+  (перед релизом Т1–Т9) → bump `distro.version` / CHANGELOG / тег.

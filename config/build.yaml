@@ -11,11 +11,12 @@ debian:
   components: main contrib non-free-firmware
 
 mikopbx:
-  image: mikopbx/mikopbx:2026.6.99-amd64
-  digest: "sha256:6489e2a72ee6c670383ce7f61e21ad419880193ecad964d93e91596256c1c4b0"
+  # pin: image+digest; процедура bump — docs/specs/mikopbx-update.md (#12)
+  image: mikopbx/mikopbx:2026.9.5-amd64
+  digest: "sha256:6326b3502a77484c97a5c7df18f9e73b57275373100117a00de23824f0e87337"
   # приводится к виду localhost/vlanit/mikopbx:<tag> при импорте
-  local_name: localhost/vlanit/mikopbx:2026.6.99-amd64
-  tag: "2026.6.99-amd64"
+  local_name: localhost/vlanit/mikopbx:2026.9.5-amd64
+  tag: "2026.9.5-amd64"
   container_name: mikopbx
 
 installer:

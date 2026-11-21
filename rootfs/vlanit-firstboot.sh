@@ -33,13 +33,26 @@ fi
 mkdir -p /var/spool/mikopbx/cf /var/spool/mikopbx/storage
 chown -R 1001:1001 /var/spool/mikopbx
 
-# идемпорт payload-образа MikoPBX (если установщик его не импортировал)
-IMAGE_REF="localhost/vlanit/mikopbx:2026.6.99-amd64"
-if ! podman image exists "$IMAGE_REF" 2>/dev/null; then
+# идемпорт payload-образа MikoPBX (если установщик его не импортировал).
+# Pin тега — из payload/build.yaml (тот же источник, что сборка; #12).
+_mikopbx_yaml() {
+    local f="$1" key="$2"
+    [ -f "$f" ] || return 0
+    sed -n "s/^  ${key}: //p" "$f" 2>/dev/null | head -1 | tr -d '"'
+}
+_CFG="$(find /var/lib/vlanit/payload /opt/vlanit/payload -maxdepth 1 -name build.yaml 2>/dev/null | head -1)"
+IMAGE_REF="$(_mikopbx_yaml "${_CFG:-}" local_name)"
+if [ -z "$IMAGE_REF" ]; then
+    _tag="$(_mikopbx_yaml "${_CFG:-}" tag)"
+    [ -n "$_tag" ] && IMAGE_REF="localhost/vlanit/mikopbx:${_tag}"
+fi
+if [ -z "$IMAGE_REF" ]; then
+    log "WARN: mikopbx.local_name/tag не найдены в payload/build.yaml"
+elif ! podman image exists "$IMAGE_REF" 2>/dev/null; then
     PAYLOAD="$(find /var/lib/vlanit/payload /opt/vlanit/payload -maxdepth 1 -name 'mikopbx-*.tar.zst' 2>/dev/null | head -1)"
     if [ -n "$PAYLOAD" ]; then
-        log "импорт образа MikoPBX из $PAYLOAD"
-        zcat "$PAYLOAD" | podman load
+        log "импорт образа MikoPBX из $PAYLOAD → $IMAGE_REF"
+        zstd -dc "$PAYLOAD" 2>/dev/null | podman load || zcat "$PAYLOAD" | podman load
         podman tag "$(podman images --format '{{.Repository}}:{{.Tag}}' | grep mikopbx | head -1)" "$IMAGE_REF" 2>/dev/null || true
     else
         log "WARN: payload образа не найден, предполагается предварительный импорт"
