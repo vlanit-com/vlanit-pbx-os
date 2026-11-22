@@ -4,6 +4,29 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.4 (2026-11-22)
+
+- Сборка: пересборка Golden/Live с актуальным Debian 13 (trixie) +
+  `trixie-updates` + `debian-security` (point release 13.8 и DSA на
+  дату сборки). Цель — подтянуть закрытые уязвимости в пакетах ОС.
+- Security в пакетах golden (есть в образе; DSA → CVE):
+  - `gpgme1.0` / `libgpgme11t64` — DSA-6646, CVE-2026-129975
+    (OpenPGP user id → info leak / DoS / RCE)
+  - `openssl` / `libssl3t64` — DSA-6531 (и обновления до
+    `3.5.9-1~deb13u1`)
+  - `curl` / `libcurl4t64` — DSA-6558 (`8.14.1-2+deb13u7`)
+  - `xz-utils` / `liblzma5` — DSA-6549
+  - `expat` / `libexpat1` — DSA-6566
+  - `libpng1.6` — DSA-6537
+  - `brotli` — DSA-6582
+  - `pcre2` — DSA-6530
+  - `ca-certificates` — DSA-6572
+  - `jq` — DSA-6416
+  - `zlib` — DSA-6613
+  - `linux` `6.12.117` — DSA-6628 / DSA-6616 / DSA-6602 (и др. в 13.8)
+- Не в образе (DSA не применяется): `webkit2gtk` DSA-6647, chromium,
+  libreoffice и пр. Консольный GUI — `netsurf-fb`.
+
 ## 1.4.3 (2026-11-21)
 
 - Doctor GUI: HTML + `netsurf-fb` поверх `vlanit-doctor` (сводка,
