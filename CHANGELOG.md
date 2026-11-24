@@ -4,6 +4,18 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.5 (2026-11-24)
+
+- Поле #18: дефолт часового пояса мастера `Asia/Dubai`; в VLANIT-ENV —
+  `TZ` + `PBX_TIMEZONE` (DockerCloud → `PBXTimezone` с первого старта).
+- Поле #45: `vlanit-atc-password-heal` при stop mikopbx → exit 0 (без
+  `degraded`).
+- Поле #60: Debian `netsurf-fb` без surface `linux` → `sdl` +
+  `SDL_VIDEODRIVER=fbcon`; смерть browser → fallback TUI/dialog
+  (installer/doctor/update).
+- Поле #61: `vlanit-build:1.2` с apt cargo/rustc; `make iso` hard-fail
+  без `vlanit-tui`; force `vlanit.ui=tui` без бинаря → dialog.
+
 ## 1.4.4 (2026-11-22)
 
 - Сборка: пересборка Golden/Live с актуальным Debian 13 (trixie) +

@@ -33,7 +33,7 @@ hint_hostname() { echo "hostnamectl set-hostname vlanit-pbx-001"; }
 
 desc_timezone-set() { echo "часовой пояс задан (/etc/timezone)"; }
 check_timezone-set() { [ -s /etc/timezone ]; }
-hint_timezone-set() { echo "timedatectl set-timezone Europe/Moscow"; }
+hint_timezone-set() { echo "timedatectl set-timezone Asia/Dubai"; }
 
 desc_timesyncd() { echo "служба timesyncd активна"; }
 check_timesyncd() { systemctl is-active --quiet systemd-timesyncd; }

@@ -267,7 +267,14 @@ check "no-ordering-cycle" sh -c "! journalctl -b 2>/dev/null | grep -qi 'orderin
 check "atc-secret-exists" lib
 check "atc-no-plaintext-in-quadlet" lib
 check "atc-dockerenv-mount" sh -c "podman inspect mikopbx --format '{{range .Mounts}}{{.Destination}} {{end}}' | grep -q '/.dockerenv'"
-check "atc-tz-env" sh -c "podman exec mikopbx sh -c 'test -n \"\$TZ\"'"
+check "atc-tz-env" sh -c "podman exec mikopbx sh -c 'test -n \"\$TZ\" && test -n \"\$PBX_TIMEZONE\"'"
+# issue #18: env TZ/PBX_TIMEZONE = /etc/timezone хоста
+check "atc-tz-match" sh -c '
+  host="$(cat /etc/timezone)"
+  ctz="$(podman exec mikopbx printenv TZ 2>/dev/null)"
+  cpbx="$(podman exec mikopbx printenv PBX_TIMEZONE 2>/dev/null)"
+  [ -n "$host" ] && [ "$ctz" = "$host" ] && [ "$cpbx" = "$host" ]
+'
 # journal-persistent проверяется после reboot-фазы (см. ниже)
 
 # --- перезагрузка и проверка сохранения (Т4: автозапуск после reboot) ---

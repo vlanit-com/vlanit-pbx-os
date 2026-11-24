@@ -63,8 +63,8 @@
 ## Learned User Preferences
 
 - GUI-установщик: HTML+FB primary; Cursive fallback; dialog не primary.
-- UI править в `installer/gui/` / `doctor/gui/` (+fallback при нужде);
-  скрины после UI.
+- UI править в `installer/gui/` / `doctor/gui/` / `update/gui/`
+  (+fallback при нужде); скрины после UI; doctor и OTA-GUI — один стиль.
 - Формы: одна вертикаль полей; схемы дисков не ломать колонки.
 - Wiki/user docs установки — под GUI-мастер; текст+скрины вместе.
 
@@ -80,17 +80,26 @@ git-ветку или одноразовый статус задачи.
 - OpenSpec установщика: `openspec/changes/` → archive → `openspec/specs/`.
 - `make iso` в worktree: нужен реальный `build/payload` (symlink часто
   не виден в docker-mount).
-- TUI-сборка: `scripts/build-tui.sh` (Docker `rust:1.85-bookworm`) →
-  `installer/bin/vlanit-tui`.
+- TUI-сборка: `scripts/build-tui.sh` → `installer/bin/vlanit-tui`
+  (хост: docker `rust:1.85-bookworm`; внутри `vlanit-build:1.2+`: apt cargo;
+  `build.sh` hard-fail без бинаря).
+- netsurf-fb: Debian без surface `linux` → `sdl`+`SDL_VIDEODRIVER=fbcon`
+  (`installer/lib/netsurf-fb.sh`); смерть browser → fallback TUI/dialog.
 - Галереи UI: installer `docs/gui-installer.md` + `shots/`; doctor
   `docs/doctor-gui.md` + `shots/`; OTA `docs/update-gui.md` + `shots/`;
   установка `docs/installation.md`.
 - Doctor: CLI `rootfs/vlanit-doctor` + GUI `doctor/gui/`
   (`vlanit-doctor --gui`); проверки в `rootfs/lib-checks.sh`;
   pending NTP / apt-security → WARN (не FAIL); кнопка OTA →
-  `vlanit-update --gui` (#58).
+  `vlanit-update --gui`, иначе CLI на консоли; OTA GUI `update/gui/`
+  (токены `#0a0a0a` / `#e6b800`, как у doctor).
+- Pin MikoPBX: `config/build.yaml` / `release-manifest.yaml`
+  (`mikopbx.image`); OTA-спека `docs/specs/ota-update.md`.
 - ISO slim: `scripts/slim-rootfs.sh` (locale/doc/plymouth; из golden/live
   rootfs hooks).
 - Plymouth без железа: QEMU burst PPM / `virtio-vga` —
   `docs/specs/1.3.2-plymouth-verify.md`.
-- Полевой план: `docs/specs/field-visit-plan.md`.
+- Часовой пояс: дефолт мастера `Asia/Dubai`; в VLANIT-ENV —
+  `TZ` + `PBX_TIMEZONE` (DockerCloud → `PBXTimezone` с первого старта);
+  `vlanit-atc-password-heal` при stop mikopbx → exit 0 (без degraded);
+  спека `docs/specs/field-tz-heal-18-45.md`.

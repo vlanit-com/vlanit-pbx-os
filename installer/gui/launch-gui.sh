@@ -3,6 +3,8 @@
 set -Eeuo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../lib/netsurf-fb.sh
+. "$INSTALLER_DIR/lib/netsurf-fb.sh"
 export INSTALLER_DIR
 export VLANIT_GUI_STATIC="$INSTALLER_DIR/gui/static"
 export VLANIT_GUI_PORT="${VLANIT_GUI_PORT:-8765}"
@@ -25,10 +27,19 @@ except Exception:
 PY
 fi
 
+SURFACE="$(vlanit_fb_pick_surface)" || {
+    echo "vlanit-gui: нет /dev/fb0 и VLANIT_FB_SURFACE — fallback TUI/dialog" >&2
+    exit 1
+}
+
 rm -f "$RUN_DIR/gui-done"
 python3 "$INSTALLER_DIR/gui/server.py" &
 SRV_PID=$!
-cleanup() { kill "$SRV_PID" 2>/dev/null || true; }
+NS_PID=""
+cleanup() {
+    kill "$NS_PID" 2>/dev/null || true
+    kill "$SRV_PID" 2>/dev/null || true
+}
 trap cleanup EXIT
 
 # ждём порт
@@ -40,25 +51,12 @@ for _ in $(seq 1 50); do
 done
 
 URL="http://127.0.0.1:${VLANIT_GUI_PORT}/"
-SURFACE="${VLANIT_FB_SURFACE:-}"
-if [ -z "$SURFACE" ]; then
-    if [ -c /dev/fb0 ]; then SURFACE=linux; else SURFACE=sdl; fi
-fi
+NS_PID="$(vlanit_fb_start_netsurf "$URL" "$SURFACE")"
 
-if [ "$SURFACE" = "linux" ]; then
-    netsurf-fb -f linux "$URL" &
-else
-    netsurf-fb -f sdl -w 1024 -h 768 "$URL" &
+if ! vlanit_fb_wait_done "$SRV_PID" "$NS_PID" "$RUN_DIR/gui-done"; then
+    echo "vlanit-gui: netsurf-fb ($SURFACE) не стартовал/упал — fallback" >&2
+    exit 1
 fi
-NS_PID=$!
-
-# ждём gui-done (ok) или смерть сервера
-while kill -0 "$SRV_PID" 2>/dev/null; do
-    if [ -f "$RUN_DIR/gui-done" ]; then
-        break
-    fi
-    sleep 0.3
-done
 
 kill "$NS_PID" 2>/dev/null || true
 wait "$NS_PID" 2>/dev/null || true

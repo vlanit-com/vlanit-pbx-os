@@ -106,6 +106,8 @@ chmod 0755 "$ROOTFS/opt/vlanit/installer/vlanit-installer"
 chmod 0755 "$ROOTFS/opt/vlanit/installer/bin/"* 2>/dev/null || true
 chmod 0755 "$ROOTFS/opt/vlanit/installer/gui/"*.sh 2>/dev/null || true
 chmod 0755 "$ROOTFS/opt/vlanit/installer/gui/server.py"
+install -D -m 0644 "$PROJECT_ROOT/installer/lib/netsurf-fb.sh" \
+    "$ROOTFS/opt/vlanit/lib/netsurf-fb.sh"
 install -D -m 0755 "$PROJECT_ROOT/live/vlanit-init" "$ROOTFS/opt/vlanit/vlanit-init"
 install -D -m 0755 "$PROJECT_ROOT/live/initramfs-hook-vlanit-live" \
     "$ROOTFS/etc/initramfs-tools/hooks/vlanit-live"

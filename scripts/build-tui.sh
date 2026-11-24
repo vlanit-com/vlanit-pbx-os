@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/build-tui.sh — сборка vlanit-tui (Cursive) → installer/bin/vlanit-tui.
-# Предпочтительно: официальный образ rust (не раздувает vlanit-build).
-# Fallback: cargo на хосте. Нет cargo/docker — пропуск (dialog fallback).
+# Предпочтительно: docker rust:1.85 (хост). Внутри vlanit-build (≥1.2) —
+# apt cargo/rustc 1.85 (CI make iso без вложенного docker). Нет ни того
+# ни другого — пропуск (dialog fallback).
 set -Eeuo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

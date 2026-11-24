@@ -175,7 +175,7 @@ state: dict = {
     "admin_user": "vlanit",
     "admin_pass": "",
     "ssh": "yes",
-    "timezone": "Europe/Moscow",
+    "timezone": "Asia/Dubai",
     "wg": "no",
     "wg_addr": "10.66.66.1/24",
     "wg_port": "51820",
@@ -348,7 +348,7 @@ def render_system() -> bytes:
 {form_row("Имя АТС", f'<input type="text" name="pbx_name" value="{esc(state.get("pbx_name"))}">')}
 {form_row("Пароль веб-АТС", '<input type="password" name="pbx_pass" value="" placeholder="пусто = автоген">')}
 </table>
-<p class="muted">Часовой пояс — IANA (напр. Europe/Moscow). Пустой пароль веб-АТС = автоген.</p>
+<p class="muted">Часовой пояс — IANA (напр. Asia/Dubai). Пустой пароль веб-АТС = автоген.</p>
 </div>
 {nav_buttons()}
 </form>
@@ -570,7 +570,7 @@ def validate_and_advance(form: dict) -> None:
         if ap:
             state["admin_pass"] = ap
         state["ssh"] = (form.get("ssh") or ["yes"])[0]
-        state["timezone"] = (form.get("timezone") or ["Europe/Moscow"])[0].strip()
+        state["timezone"] = (form.get("timezone") or ["Asia/Dubai"])[0].strip()
         state["pbx_name"] = (form.get("pbx_name") or ["VLANit-PBX"])[0]
         state["pbx_pass"] = (form.get("pbx_pass") or [""])[0]
         if len(state["admin_pass"]) < 8:

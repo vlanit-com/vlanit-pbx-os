@@ -3,6 +3,8 @@
 # чтобы не требовать root на сборочной машине.
 FROM debian:13
 
+# cargo/rustc 1.85 — сборка vlanit-tui внутри make iso (CI/build-iso:
+# вложенного docker нет, бинарь в gitignore).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         mmdebstrap \
         xorriso \
@@ -23,6 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xz-utils \
         gpg \
         debian-archive-keyring \
+        build-essential \
+        cargo \
+        rustc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build

@@ -142,6 +142,8 @@ install -D -m 0755 "$PROJECT_ROOT/rootfs/vlanit-doctor-gui" \
     "$ROOTFS/usr/local/sbin/vlanit-doctor-gui"
 install -D -m 0644 "$PROJECT_ROOT/rootfs/lib-checks.sh" \
     "$ROOTFS/opt/vlanit/lib/checks.sh"
+install -D -m 0644 "$PROJECT_ROOT/installer/lib/netsurf-fb.sh" \
+    "$ROOTFS/opt/vlanit/lib/netsurf-fb.sh"
 # doctor GUI (issue #56): HTTP + netsurf-fb
 install -d -m 0755 "$ROOTFS/opt/vlanit/doctor/static" \
     "$ROOTFS/opt/vlanit/doctor/templates"

@@ -72,7 +72,7 @@ fn write_config(d: &Draft) {
             "password": d.admin_pass,
         },
         "ssh_enabled": if d.ssh.is_empty() { "yes" } else { &d.ssh },
-        "timezone": if d.timezone.is_empty() { "Europe/Moscow" } else { &d.timezone },
+        "timezone": if d.timezone.is_empty() { "Asia/Dubai" } else { &d.timezone },
         "wireguard": {
             "enabled": if d.wg.is_empty() { "no" } else { &d.wg },
             "address": if d.wg_addr.is_empty() { "10.66.66.1/24" } else { &d.wg_addr },
@@ -368,7 +368,7 @@ fn screen_system(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
         .child(
             "TZ:",
             EditView::new()
-                .content("Europe/Moscow")
+                .content("Asia/Dubai")
                 .with_name("tz")
                 .fixed_width(24),
         )
@@ -544,7 +544,7 @@ fn main() {
         hostname: "vlanit-pbx".into(),
         admin_user: "vlanit".into(),
         ssh: "yes".into(),
-        timezone: "Europe/Moscow".into(),
+        timezone: "Asia/Dubai".into(),
         wg: "no".into(),
         wg_addr: "10.66.66.1/24".into(),
         wg_port: "51820".into(),

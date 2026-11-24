@@ -4,7 +4,7 @@
 
 ```
 Сборочная машина (docker)
-  Dockerfile.build (Debian 13 + mmdebstrap/xorriso/grub)
+  Dockerfile.build (Debian 13 + mmdebstrap/xorriso/grub + cargo/rustc → vlanit-tui)
     10-golden-rootfs.sh   Golden Image: Debian 13 + podman + VLANit-службы
     20-live-rootfs.sh     Live: ядро + GUI/TUI установщик + netsurf-fb -> squashfs
     30-initramfs.sh       initramfs с кастомным vlanit-init
