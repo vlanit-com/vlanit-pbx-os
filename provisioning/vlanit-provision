@@ -34,6 +34,8 @@ ALLOWED_MIKOPBX_ENV = {
     "RTP_PORT_FROM", "RTP_PORT_TO", "IAX_PORT", "AMI_PORT", "AJAM_PORT",
     "AJAM_PORT_TLS", "BEANSTALK_PORT", "REDIS_PORT", "GNATS_PORT",
     "ID_WWW_USER", "ID_WWW_GROUP",
+    # issue #18: DockerCloud → PbxSettings::PBX_TIMEZONE; TZ — системный пояс
+    "PBX_TIMEZONE", "TZ",
 }
 
 HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$")
