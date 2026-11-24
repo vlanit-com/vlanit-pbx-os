@@ -205,7 +205,7 @@ $warn"
         NET_DNS="$(dialog --title "DNS" --inputbox "DNS-серверы (через пробел):" 8 60 "9.9.9.9" --stdout)" || exit 1
     fi
 
-    SYS_HOSTNAME="vlanit-pbx" ADMIN_USER="vlanit" ADMIN_PASS="" SSH_ENABLED="yes" TZ_NAME="Europe/Moscow"
+    SYS_HOSTNAME="vlanit-pbx" ADMIN_USER="vlanit" ADMIN_PASS="" SSH_ENABLED="yes" TZ_NAME="Asia/Dubai"
     WG_ENABLED="no" WG_ADDR="10.66.66.1/24" WG_PORT="51820" WG_PEERS_FILE=""
     SYS_HOSTNAME="$(dialog --title "Экран 4. Параметры системы" --inputbox "Hostname:" 8 60 "vlanit-pbx" --stdout)" || exit 1
     ADMIN_USER="$(dialog --title "Локальный администратор" --inputbox "Имя пользователя:" 8 60 "vlanit" --stdout)" || exit 1
@@ -217,7 +217,7 @@ $warn"
     c="$(dialog --title "SSH" --menu "SSH-сервер:" 9 60 3 1 "Включить" 2 "Отключить" --stdout)" || exit 1
     [ "$c" = "2" ] && SSH_ENABLED="no"
     while :; do
-        TZ_NAME="$(dialog --title "Часовой пояс" --inputbox "Часовой пояс (IANA, напр. Europe/Moscow):" 8 60 "Europe/Moscow" --stdout)" || exit 1
+        TZ_NAME="$(dialog --title "Часовой пояс" --inputbox "Часовой пояс (IANA, напр. Asia/Dubai):" 8 60 "Asia/Dubai" --stdout)" || exit 1
         [ -f "/usr/share/zoneinfo/$TZ_NAME" ] && break
         dialog --msgbox "Неизвестный часовой пояс: $TZ_NAME" 7 60
     done

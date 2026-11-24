@@ -160,7 +160,7 @@ EOF
 }
 
 configure_target_mikopbx() {
-    local pbx_name="$1" admin_login="$2" admin_pass="$3" tz="${4:-Europe/Moscow}"
+    local pbx_name="$1" admin_login="$2" admin_pass="$3" tz="${4:-Asia/Dubai}"
     local quadlet="$SYS_MNT/etc/containers/systemd/mikopbx.container"
     [ -f "$quadlet" ] || die "quadlet-файл отсутствует в Golden Image"
     # блок VLANIT-ENV (идемпотентно, маркеры совместимы с vlanit-provision).
@@ -194,9 +194,11 @@ path, name, login, passwd, tz = sys.argv[1:6]
 vlanit_quadlet.write_env_block(path, [
     ("PBX_NAME", name),
     ("WEB_ADMIN_LOGIN", login),
-    # часовой пояс АТС = пояс устройства (issue #18; /etc/localtime тоже
-    # проброшен в контейнер — TZ задаёт системный пояс внутри)
+    # часовой пояс АТС = пояс устройства (issue #18):
+    # TZ — системный пояс контейнера; PBX_TIMEZONE — PbxSettings через
+    # DockerCloud (каждый старт, 12-factor); /etc/localtime проброшен Volume=
     ("TZ", tz),
+    ("PBX_TIMEZONE", tz),
 ])
 PYEOF
     chmod 600 "$quadlet"

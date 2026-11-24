@@ -115,9 +115,11 @@ GUI и TUI — одни шаги, бэкенд общий. Галерея:
 ## Часовой пояс
 
 Мастер (экран «Система», с 1.2.9) спрашивает IANA-часовой пояс
-(по умолчанию `Europe/Moscow`). Установщик пишет `/etc/timezone` и
-`/etc/localtime`; синхронизация времени — systemd-timesyncd.
-Через autoinstall.yaml: ключ `timezone` (например `Europe/Moscow`).
+(по умолчанию `Asia/Dubai`). Установщик пишет `/etc/timezone` и
+`/etc/localtime`, в контейнер АТС — `TZ` + `PBX_TIMEZONE` (DockerCloud
+применяет `PBXTimezone` при каждом старте). Синхронизация —
+systemd-timesyncd. Через autoinstall.yaml: ключ `timezone`
+(например `Asia/Dubai`).
 
 ## WireGuard VPN (преднастройка при установке)
 
