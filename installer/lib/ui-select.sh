@@ -67,6 +67,10 @@ ui_collect_config() {
             fi
             ;;
         tui)
+            if ! ui_cursive_available; then
+                log "vlanit-tui отсутствует — fallback dialog (#61)"
+                return 2
+            fi
             "$INSTALLER_DIR/bin/vlanit-tui" || return 1
             UI_FRONTEND=tui
             ;;

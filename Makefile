@@ -9,11 +9,11 @@ all: iso
 # пользователем приводит к rootfs с uid 1000 и неработающему sudo (полевой
 # дефект 1.2.4, см. docs/specs/1.2.9-field-fixes.md).
 iso: check image
-	docker run --rm --privileged -v "$$PWD:/build" vlanit-build:1.1 bash scripts/build.sh
+	docker run --rm --privileged -v "$$PWD:/build" vlanit-build:1.2 bash scripts/build.sh
 
-# build-контейнер (scripts/Dockerfile.build)
+# build-контейнер (scripts/Dockerfile.build); 1.2 = +cargo/rustc для vlanit-tui
 image:
-	docker build -q -t vlanit-build:1.1 -f scripts/Dockerfile.build scripts/ >/dev/null
+	docker build -q -t vlanit-build:1.2 -f scripts/Dockerfile.build scripts/ >/dev/null
 
 # Автоматизированные тесты в QEMU/KVM
 test: check

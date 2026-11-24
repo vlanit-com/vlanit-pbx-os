@@ -11,7 +11,7 @@ HTML-мастер на `netsurf-fb` (primary). Fallback: Cursive TUI, затем
 Пересъёмка:
 
 ```bash
-docker run --rm -v "$PWD:/build" -w /build vlanit-build:1.1 \
+docker run --rm -v "$PWD:/build" -w /build vlanit-build:1.2 \
   python3 scripts/render-gui-assets.py
 bash scripts/shot-gui-html.sh
 cp -a build/release-shots/gui-installer/*.png docs/gui-installer/shots/
@@ -85,7 +85,7 @@ IP, URL веб-админки, опционально сген. пароль / W
 
 | Условие | UI |
 |---|---|
-| `/dev/fb0` + `netsurf-fb` | HTML GUI |
+| `/dev/fb0` + `netsurf-fb` | HTML GUI (`sdl`+fbcon; Debian без surface `linux`, #60) |
 | нет fb / GUI упал | `vlanit-tui` (Cursive) |
 | нет бинаря TUI | `dialog` (тема 1.3.3) |
 | `autoinstall.yaml` | без UI |

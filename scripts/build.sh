@@ -26,7 +26,9 @@ log "проверка SHA256 payload"
 
 log "=== сборка vlanit-tui (Cursive) ==="
 bash "$PROJECT_ROOT/scripts/build-tui.sh" 2>&1 | tee "$LOG_DIR/build-tui.log" || \
-    log "предупреждение: vlanit-tui не собран (fallback dialog)"
+    fail "vlanit-tui: build-tui.sh завершился с ошибкой"
+[ -x "$PROJECT_ROOT/installer/bin/vlanit-tui" ] || \
+    fail "vlanit-tui не собран (нужен cargo в vlanit-build ≥1.2; см. #61)"
 
 STEPS=(10-golden-rootfs 20-live-rootfs 30-initramfs 40-staging 50-iso)
 for step in "${STEPS[@]}"; do
