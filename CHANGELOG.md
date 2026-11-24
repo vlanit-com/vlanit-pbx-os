@@ -23,7 +23,8 @@
   - `ca-certificates` — DSA-6572
   - `jq` — DSA-6416
   - `zlib` — DSA-6613
-  - `linux` `6.12.117` — DSA-6628 / DSA-6616 / DSA-6602 (и др. в 13.8)
+  - `linux` `6.12.118` (было `6.12.117` в 1.4.3) — DSA-6628 /
+    DSA-6616 / DSA-6602 (и др. в 13.8)
 - Не в образе (DSA не применяется): `webkit2gtk` DSA-6647, chromium,
   libreoffice и пр. Консольный GUI — `netsurf-fb`.
 
