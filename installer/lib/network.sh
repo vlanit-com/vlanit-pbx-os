@@ -1,10 +1,14 @@
 # Настройка сети: выбор интерфейса, DHCP/static; конфиг для установленной системы.
 list_interfaces() {
-    ip -o link show | awk -F': ' '$2 != "lo" && $2 !~ /^docker|^veth/ {print $2}'
+    # eth0@if3 → eth0 (sysfs без суффикса)
+    ip -o link show | awk -F': ' '
+        $2 != "lo" && $2 !~ /^docker|^veth|^br-/ {
+            split($2, a, "@"); print a[1]
+        }'
 }
 
 iface_mac() {
-    cat "/sys/class/net/$1/address" 2>/dev/null
+    cat "/sys/class/net/$1/address" 2>/dev/null || printf ''
 }
 
 # Применить конфиг к живой среде (чтобы post-install проверки работали)

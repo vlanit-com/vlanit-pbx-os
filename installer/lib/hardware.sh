@@ -7,7 +7,8 @@ collect_hardware_info() {
     HW_RAM_MB=$((HW_RAM_KB / 1024))
     HW_BOOT_MODE="UEFI"
     [ -d /sys/firmware/efi ] || HW_BOOT_MODE="Legacy/CSM"
-    HW_INTERFACES="$(ip -o link show | awk -F': ' '$2 != "lo" {print $2}')"
+    HW_INTERFACES="$(ip -o link show | awk -F': ' '
+        $2 != "lo" { split($2, a, "@"); print a[1] }')"
 }
 
 hardware_warnings() {
