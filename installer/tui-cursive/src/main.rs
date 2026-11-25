@@ -36,19 +36,32 @@ fn installer_dir() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("/opt/vlanit/installer"))
 }
 
-fn probe(kind: &str) -> Value {
+fn probe(kind: &str) -> Result<Value, String> {
     let probe = installer_dir().join("bin/vlanit-probe");
     let out = Command::new(&probe)
         .arg(kind)
         .output()
-        .unwrap_or_else(|e| panic!("vlanit-probe {kind}: {e}"));
+        .map_err(|e| format!("vlanit-probe {kind}: {e}"))?;
     if !out.status.success() {
-        panic!(
+        return Err(format!(
             "vlanit-probe {kind} failed: {}",
             String::from_utf8_lossy(&out.stderr)
-        );
+        ));
     }
-    serde_json::from_slice(&out.stdout).expect("probe json")
+    serde_json::from_slice(&out.stdout).map_err(|e| format!("probe json: {e}"))
+}
+
+fn select_value(s: &mut Cursive, name: &str) -> String {
+    s.call_on_name(name, |v: &mut SelectView<String>| v.selection())
+        .flatten()
+        .map(|x| (*x).clone())
+        .unwrap_or_default()
+}
+
+fn select_or_first(sel: &mut SelectView<String>) {
+    if !sel.is_empty() {
+        let _ = sel.set_selection(0);
+    }
 }
 
 fn config_path() -> PathBuf {
@@ -101,7 +114,17 @@ fn show_error(siv: &mut Cursive, msg: &str) {
 }
 
 fn screen_hardware(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
-    let hw = probe("hardware");
+    let hw = match probe("hardware") {
+        Ok(v) => v,
+        Err(e) => {
+            show_error(siv, &e);
+            siv.add_layer(
+                Dialog::text("Не удалось опросить оборудование.")
+                    .button("Выход", |s| s.quit()),
+            );
+            return;
+        }
+    };
     let text = format!(
         "Процессор: {} ({} ядер)\nОЗУ: {} МБ\nИнтерфейсы: {}\nРежим загрузки: {}\n{}",
         hw["cpu"].as_str().unwrap_or(""),
@@ -123,10 +146,13 @@ fn screen_hardware(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
         Dialog::around(TextView::new(text))
             .title("Экран 1. Оборудование")
             .button("Далее", move |s| {
-                let boot = probe("hardware")["boot_mode"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
+                let boot = match probe("hardware") {
+                    Ok(v) => v["boot_mode"].as_str().unwrap_or("").to_string(),
+                    Err(e) => {
+                        show_error(s, &e);
+                        return;
+                    }
+                };
                 if boot != "UEFI" {
                     show_error(s, "Требуется UEFI.");
                     return;
@@ -139,11 +165,20 @@ fn screen_hardware(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
 }
 
 fn screen_disk(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
-    let data = probe("disks");
+    let data = match probe("disks") {
+        Ok(v) => v,
+        Err(e) => {
+            show_error(siv, &e);
+            return;
+        }
+    };
     let disks = data["disks"].as_array().cloned().unwrap_or_default();
     let mut sel = SelectView::<String>::new().autojump();
     for d in &disks {
         let dev = d["dev"].as_str().unwrap_or("").to_string();
+        if dev.is_empty() {
+            continue;
+        }
         let label = format!(
             "{}  {} GiB  {}  [{}]",
             dev,
@@ -153,17 +188,18 @@ fn screen_disk(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
         );
         sel.add_item(label, dev);
     }
+    if sel.is_empty() {
+        show_error(siv, "Нет подходящих дисков.");
+        return;
+    }
+    select_or_first(&mut sel);
     let draft2 = draft.clone();
     let draft_back = draft.clone();
     siv.add_layer(
         Dialog::around(sel.with_name("disk").fixed_height(10))
             .title("Экран 2. Диск")
             .button("Далее", move |s| {
-                let disk = s
-                    .call_on_name("disk", |v: &mut SelectView<String>| v.selection())
-                    .flatten()
-                    .map(|x| (*x).clone())
-                    .unwrap_or_default();
+                let disk = select_value(s, "disk");
                 if disk.is_empty() {
                     show_error(s, "Выберите диск.");
                     return;
@@ -180,7 +216,13 @@ fn screen_disk(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
 }
 
 fn screen_mirror(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: String) {
-    let data = probe("disks");
+    let data = match probe("disks") {
+        Ok(v) => v,
+        Err(e) => {
+            show_error(siv, &e);
+            return;
+        }
+    };
     let disks = data["disks"].as_array().cloned().unwrap_or_default();
     let others: Vec<_> = disks
         .iter()
@@ -195,6 +237,7 @@ fn screen_mirror(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: String) {
     let mut mode = SelectView::<String>::new();
     mode.add_item("Один диск", "single".into());
     mode.add_item("Зеркало RAID1", "raid1".into());
+    select_or_first(&mut mode);
     let draft2 = draft.clone();
     let draft_back = draft.clone();
     let primary2 = primary.clone();
@@ -206,11 +249,8 @@ fn screen_mirror(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: String) {
         )
         .title("Режим дисков")
         .button("Далее", move |s| {
-            let m = s
-                .call_on_name("mmode", |v: &mut SelectView<String>| v.selection())
-                .flatten()
-                .map(|x| (*x).clone())
-                .unwrap_or_else(|| "single".into());
+            let m = select_value(s, "mmode");
+            let m = if m.is_empty() { "single".into() } else { m };
             s.pop_layer();
             if m == "raid1" {
                 screen_mirror_pick(s, draft2.clone(), primary2.clone());
@@ -227,12 +267,18 @@ fn screen_mirror(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: String) {
 }
 
 fn screen_mirror_pick(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: String) {
-    let data = probe("disks");
+    let data = match probe("disks") {
+        Ok(v) => v,
+        Err(e) => {
+            show_error(siv, &e);
+            return;
+        }
+    };
     let disks = data["disks"].as_array().cloned().unwrap_or_default();
     let mut sel = SelectView::<String>::new();
     for d in disks {
         let dev = d["dev"].as_str().unwrap_or("").to_string();
-        if dev == primary {
+        if dev.is_empty() || dev == primary {
             continue;
         }
         sel.add_item(
@@ -240,16 +286,17 @@ fn screen_mirror_pick(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: Stri
             dev,
         );
     }
+    if sel.is_empty() {
+        show_error(siv, "Нет второго диска для зеркала.");
+        return;
+    }
+    select_or_first(&mut sel);
     let draft2 = draft.clone();
     siv.add_layer(
         Dialog::around(sel.with_name("mdisk"))
             .title("Второй диск зеркала")
             .button("Далее", move |s| {
-                let disk = s
-                    .call_on_name("mdisk", |v: &mut SelectView<String>| v.selection())
-                    .flatten()
-                    .map(|x| (*x).clone())
-                    .unwrap_or_default();
+                let disk = select_value(s, "mdisk");
                 if disk.is_empty() {
                     show_error(s, "Выберите второй диск.");
                     return;
@@ -262,17 +309,35 @@ fn screen_mirror_pick(siv: &mut Cursive, draft: Arc<Mutex<Draft>>, primary: Stri
 }
 
 fn screen_network(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
-    let data = probe("ifaces");
+    let data = match probe("ifaces") {
+        Ok(v) => v,
+        Err(e) => {
+            show_error(siv, &e);
+            return;
+        }
+    };
     let ifaces = data["interfaces"].as_array().cloned().unwrap_or_default();
     let mut isel = SelectView::<String>::new();
     for i in ifaces {
         let name = i["name"].as_str().unwrap_or("").to_string();
+        if name.is_empty() {
+            continue;
+        }
         let mac = i["mac"].as_str().unwrap_or("");
         isel.add_item(format!("{name} ({mac})"), name);
     }
+    if isel.is_empty() {
+        show_error(
+            siv,
+            "Нет сетевых интерфейсов (vlanit-probe ifaces). Проверьте NIC.",
+        );
+        return;
+    }
+    select_or_first(&mut isel);
     let mut mode = SelectView::<String>::new();
     mode.add_item("DHCP", "dhcp".into());
     mode.add_item("Статический IPv4", "static".into());
+    select_or_first(&mut mode);
     let layout = LinearLayout::vertical()
         .child(TextView::new("Интерфейс"))
         .child(isel.with_name("iface").fixed_height(5))
@@ -297,16 +362,13 @@ fn screen_network(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
         Dialog::around(layout)
             .title("Экран 3. Сеть")
             .button("Далее", move |s| {
-                let iface = s
-                    .call_on_name("iface", |v: &mut SelectView<String>| v.selection())
-                    .flatten()
-                    .map(|x| (*x).clone())
-                    .unwrap_or_default();
-                let nmode = s
-                    .call_on_name("nmode", |v: &mut SelectView<String>| v.selection())
-                    .flatten()
-                    .map(|x| (*x).clone())
-                    .unwrap_or_else(|| "dhcp".into());
+                let iface = select_value(s, "iface");
+                let nmode = select_value(s, "nmode");
+                let nmode = if nmode.is_empty() {
+                    "dhcp".into()
+                } else {
+                    nmode
+                };
                 let addr = s
                     .call_on_name("addr", |v: &mut EditView| v.get_content())
                     .map(|c| (*c).clone())
@@ -386,6 +448,7 @@ fn screen_system(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
     let mut ssh = SelectView::<String>::new();
     ssh.add_item("SSH вкл", "yes".into());
     ssh.add_item("SSH выкл", "no".into());
+    select_or_first(&mut ssh);
     let outer = LinearLayout::vertical()
         .child(layout)
         .child(ssh.with_name("ssh"));
@@ -401,11 +464,14 @@ fn screen_system(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
                 let tz = get_edit(s, "tz");
                 let pbx = get_edit(s, "pbx");
                 let pbxpass = get_edit(s, "pbxpass");
-                let ssh = s
-                    .call_on_name("ssh", |v: &mut SelectView<String>| v.selection())
-                    .flatten()
-                    .map(|x| (*x).clone())
-                    .unwrap_or_else(|| "yes".into());
+                let ssh = {
+                    let v = select_value(s, "ssh");
+                    if v.is_empty() {
+                        "yes".into()
+                    } else {
+                        v
+                    }
+                };
                 if pass.len() < 8 {
                     show_error(s, "Пароль короче 8 символов.");
                     return;
@@ -439,6 +505,7 @@ fn screen_wireguard(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
     let mut wg = SelectView::<String>::new();
     wg.add_item("Не включать", "no".into());
     wg.add_item("Включить после установки", "yes".into());
+    select_or_first(&mut wg);
     let layout = ListView::new()
         .child(
             "Адрес wg0:",
@@ -464,11 +531,14 @@ fn screen_wireguard(siv: &mut Cursive, draft: Arc<Mutex<Draft>>) {
         Dialog::around(outer)
             .title("Экран 5. WireGuard")
             .button("Далее", move |s| {
-                let wgv = s
-                    .call_on_name("wg", |v: &mut SelectView<String>| v.selection())
-                    .flatten()
-                    .map(|x| (*x).clone())
-                    .unwrap_or_else(|| "no".into());
+                let wgv = {
+                    let v = select_value(s, "wg");
+                    if v.is_empty() {
+                        "no".into()
+                    } else {
+                        v
+                    }
+                };
                 let wgaddr = get_edit(s, "wgaddr");
                 let wgport = get_edit(s, "wgport");
                 if wgv == "yes" && !wgport.chars().all(|c| c.is_ascii_digit()) {

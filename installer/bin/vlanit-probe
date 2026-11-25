@@ -75,18 +75,22 @@ print(json.dumps({"disks": disks, "warn_disk_gb": warn_gb}, ensure_ascii=False))
 PY
     ;;
 ifaces)
-    {
+    # Нельзя `| python3 - <<'PY'`: heredoc перехватывает stdin, pipe теряется
+    # → всегда [] → TUI падает после «Диск» (#64). Данные через env.
+    IFACES_RAW="$(
         for f in $(list_interfaces); do
             printf '%s|%s\n' "$f" "$(iface_mac "$f")"
         done
-    } | python3 - <<'PY'
-import json, sys
+    )"
+    export IFACES_RAW
+    python3 - <<'PY'
+import json, os
 out = []
-for line in sys.stdin:
+for line in (os.environ.get("IFACES_RAW") or "").splitlines():
     line = line.strip()
     if not line:
         continue
-    name, mac = line.split("|", 1)
+    name, _, mac = line.partition("|")
     out.append({"name": name, "mac": mac})
 print(json.dumps({"interfaces": out}, ensure_ascii=False))
 PY
