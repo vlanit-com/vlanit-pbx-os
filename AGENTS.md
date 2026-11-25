@@ -75,6 +75,8 @@ git-ветку или одноразовый статус задачи.
 
 - Контракт установщика: `/run/vlanit/install-config.json`, `vlanit-probe`,
   `install-run.sh`; GUI `installer/gui/`; TUI `installer/tui-cursive/`.
+  Probe ifaces: не `| python3 <<` (heredoc съедает stdin) — через env
+  (`IFACES_RAW`); спека `docs/specs/field-tui-disk-64.md`.
 - Экраны: `installer/screens.yaml`; брендинг: `installer/branding/<profile>/`
   (`VLANIT_BRANDING`).
 - OpenSpec установщика: `openspec/changes/` → archive → `openspec/specs/`.
