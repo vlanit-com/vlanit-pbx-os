@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# unit: выбор surface + смерть netsurf → fallback (#60)
+# unit: выбор surface + смерть netsurf → fallback (#60) + harden helpers
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=../../installer/lib/netsurf-fb.sh
@@ -25,13 +25,27 @@ else
     fi
 fi
 
-# wait_done: мёртвый ns → 1
+# log path helpers (без реального fb)
+export VLANIT_GUI_LOG_DIR="$TMP/run"
+[ "$(vlanit_fb_log_dir)" = "$TMP/run" ]
+[ "$(vlanit_fb_netsurf_log)" = "$TMP/run/gui-netsurf.log" ]
+export VLANIT_NETSURF_LOG="$TMP/custom-ns.log"
+[ "$(vlanit_fb_netsurf_log)" = "$TMP/custom-ns.log" ]
+unset VLANIT_NETSURF_LOG
+
+# prepare_console: не падает; при fb0 выставляет SDL_FBDEV
+unset FRAMEBUFFER SDL_FBDEV || true
+vlanit_fb_prepare_console
+if [ -c /dev/fb0 ]; then
+    [ "${FRAMEBUFFER:-}" = "/dev/fb0" ]
+    [ "${SDL_FBDEV:-}" = "/dev/fb0" ]
+fi
+
+# wait_done: мёртвый ns → 1 (grace короткий для unit)
+export VLANIT_NETSURF_GRACE=0.2
 donef="$TMP/done"
-: >"$TMP/alive"
-# fake srv держим, ns уже мёртв
 sleep 30 &
 SRV=$!
-# ns pid несуществующий
 if vlanit_fb_wait_done "$SRV" 999999 "$donef"; then
     kill "$SRV" 2>/dev/null || true
     echo "FAIL: wait_done должен вернуть 1 на мёртвом ns" >&2
@@ -45,7 +59,7 @@ sleep 30 &
 SRV=$!
 sleep 30 &
 NS=$!
-( sleep 0.2; : >"$donef" ) &
+( sleep 0.05; : >"$donef" ) &
 vlanit_fb_wait_done "$SRV" "$NS" "$donef"
 kill "$SRV" "$NS" 2>/dev/null || true
 wait "$SRV" "$NS" 2>/dev/null || true

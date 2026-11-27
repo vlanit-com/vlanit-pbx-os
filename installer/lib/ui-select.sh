@@ -1,4 +1,4 @@
-# Выбор фронтенда: HTML (netsurf-fb) → Cursive → dialog.
+# Выбор фронтенда: HTML (netsurf-fb) primary → Cursive TUI → dialog.
 
 ui_gui_available() {
     command -v netsurf-fb >/dev/null 2>&1 || return 1
@@ -34,7 +34,7 @@ UI_FRONTEND=""
 # ui_collect_config — заполняет /run/vlanit/install-config.json; 0=ok
 # return 2 → вызвать dialog collect
 ui_collect_config() {
-    local force mode
+    local force mode fallback
     force="$(ui_from_cmdline)"
     mkdir -p /run/vlanit
     rm -f /run/vlanit/install-config.json /run/vlanit/gui-done
@@ -50,6 +50,23 @@ ui_collect_config() {
             fi
             ;;
     esac
+
+    if ui_cursive_available; then
+        fallback=tui
+    else
+        fallback=dialog
+    fi
+    case "$mode" in
+        gui)
+            log "UI primary=gui; fallback=$fallback"
+            ;;
+        tui)
+            log "UI primary=tui; fallback=dialog"
+            ;;
+        dialog)
+            log "UI primary=dialog"
+            ;;
+    esac
     log "UI frontend: $mode"
 
     case "$mode" in
@@ -57,11 +74,12 @@ ui_collect_config() {
             if bash "$INSTALLER_DIR/gui/launch-gui.sh"; then
                 UI_FRONTEND=gui
             else
-                log "GUI недоступен — fallback"
                 if ui_cursive_available; then
+                    log "GUI fail → fallback tui"
                     "$INSTALLER_DIR/bin/vlanit-tui" || return 1
                     UI_FRONTEND=tui
                 else
+                    log "GUI fail → fallback dialog"
                     return 2
                 fi
             fi

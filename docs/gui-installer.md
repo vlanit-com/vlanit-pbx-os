@@ -1,12 +1,16 @@
 # GUI-установщик VLANit PBX OS
 
-HTML-мастер на `netsurf-fb` (primary). Fallback: Cursive TUI, затем
-`dialog`. Спека: [`docs/specs/gui-installer.md`](specs/gui-installer.md).
+**Primary:** HTML-мастер на `netsurf-fb` (`sdl` + `SDL_VIDEODRIVER=fbcon`
+на `/dev/fb0`). **Запасные:** Cursive TUI (`vlanit-tui`), затем `dialog`.
+`vlanit.ui=gui|tui|dialog` — только принудительный выбор, не дефолт.
+Спека: [`docs/specs/gui-installer.md`](specs/gui-installer.md);
+полевое #60/#61: [`docs/specs/field-gui-tui-60-61.md`](specs/field-gui-tui-60-61.md).
 Идея #12: [`docs/ideas/gui-installer.md`](ideas/gui-installer.md).
 
 Скрины ниже — mock-probe (типичный 2×SSD UEFI), сняты
 `scripts/shot-gui-html.sh` → `docs/gui-installer/shots/`. На железе/ISO
-тот же UI; данные оборудования реальные.
+тот же UI; данные оборудования реальные. QEMU headless часто не
+удерживает netsurf — тогда виден TUI (цепочка fallback), не смена primary.
 
 Пересъёмка:
 
@@ -17,7 +21,6 @@ bash scripts/shot-gui-html.sh
 cp -a build/release-shots/gui-installer/*.png docs/gui-installer/shots/
 ```
 
-Kernel cmdline: `vlanit.ui=gui|tui|dialog`.
 Брендинг: `VLANIT_BRANDING=<profile>` → `installer/branding/<profile>/`.
 Экраны: `installer/screens.yaml` (`enabled: false` — пропуск шага).
 
@@ -81,14 +84,18 @@ IP, URL веб-админки, опционально сген. пароль / W
 
 ---
 
-## Fallback
+## Primary / fallback
 
 | Условие | UI |
 |---|---|
-| `/dev/fb0` + `netsurf-fb` | HTML GUI (`sdl`+fbcon; Debian без surface `linux`, #60) |
-| нет fb / GUI упал | `vlanit-tui` (Cursive) |
+| `/dev/fb0` + `netsurf-fb` | **HTML primary** (`sdl`+fbcon; Debian без surface `linux`, #60) |
+| нет fb / GUI упал | Cursive TUI (`vlanit-tui`) |
 | нет бинаря TUI | `dialog` (тема 1.3.3) |
+| `vlanit.ui=…` | принудительно gui/tui/dialog |
 | `autoinstall.yaml` | без UI |
+
+Лог collect: `UI primary=gui; fallback=tui|dialog`; при падении netsurf —
+`GUI fail → fallback tui` (лог `/run/vlanit/gui-netsurf.log`).
 
 ## Связанные файлы
 

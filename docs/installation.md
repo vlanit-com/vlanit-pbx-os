@@ -12,7 +12,7 @@
 проверяет смонтированные разделы и требует явного подтверждения.
 
 ```bash
-sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.6-amd64.iso /dev/sdX
+sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.7-amd64.iso /dev/sdX
 ```
 
 (`/dev/sdX` — ваша флэшка, например `/dev/sdb`; точное имя смотрите
@@ -21,7 +21,7 @@ sudo bash scripts/write-usb.sh dist/VLANit-PBX-1.4.6-amd64.iso /dev/sdX
 Эквивалент вручную:
 
 ```bash
-sudo dd if=VLANit-PBX-1.4.6-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+sudo dd if=VLANit-PBX-1.4.7-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
 sync
 ```
 
@@ -46,7 +46,7 @@ sync
 # узнать идентификатор флэшки, например disk4
 diskutil list
 diskutil unmountDisk /dev/disk4
-sudo dd if=VLANit-PBX-1.4.6-amd64.iso of=/dev/rdisk4 bs=4m
+sudo dd if=VLANit-PBX-1.4.7-amd64.iso of=/dev/rdisk4 bs=4m
 diskutil eject /dev/disk4
 ```
 
@@ -65,11 +65,11 @@ diskutil eject /dev/disk4
 ```bash
 # 1) подпись контрольной суммы (публичный ключ — в репозитории, rootfs/etc-vlanit-release.pub)
 gpg --no-default-keyring --keyring rootfs/etc-vlanit-release.pub \
-    --verify dist/VLANit-PBX-1.4.6-amd64.iso.sha256.asc
+    --verify dist/VLANit-PBX-1.4.7-amd64.iso.sha256.asc
 # ожидается: «Действительная подпись VLANit PBX OS Release»
 
 # 2) целостность образа
-sha256sum -c dist/VLANit-PBX-1.4.6-amd64.iso.sha256   # сверить образ до записи
+sha256sum -c dist/VLANit-PBX-1.4.7-amd64.iso.sha256   # сверить образ до записи
 # после записи — сравнить первые блоки (Linux):
 sudo head -c 1G /dev/sdX | sha256sum   # должно совпасть с началом образа
 ```
@@ -80,10 +80,11 @@ sudo head -c 1G /dev/sdX | sha256sum   # должно совпасть с нач
 2. Выберите UEFI-загрузку с USB. Требуется UEFI (Legacy BIOS не поддерживается).
 3. В меню GRUB выберите «Установить VLANit PBX OS … (UEFI)».
 
-Live-среда загрузится и запустит VLANit Installer. По умолчанию —
-**графический мастер** (HTML на framebuffer через `netsurf-fb`). Если
-нет `/dev/fb0` или GUI не стартовал — Cursive TUI (`vlanit-tui`), затем
-`dialog`. Принудительно: в cmdline GRUB `vlanit.ui=gui|tui|dialog`.
+Live-среда загрузится и запустит VLANit Installer. **Primary** —
+графический HTML-мастер (`netsurf-fb` на framebuffer). **Запасные:**
+Cursive TUI (`vlanit-tui`), затем `dialog` (если нет бинаря TUI или GUI
+не удержался). Параметр GRUB `vlanit.ui=gui|tui|dialog` только
+принудительно переключает UI; без него всегда пробуется HTML.
 
 Галерея экранов: [`docs/gui-installer.md`](gui-installer.md).
 
