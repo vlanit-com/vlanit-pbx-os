@@ -4,6 +4,17 @@
 релиза по тегу `vX.Y.Z` берёт текст секции из этого файла как описание релиза
 (идея #11: тег не меняется, описание — часть исходников на коммите тега).
 
+## 1.4.7 (2026-11-27)
+
+- HTML GUI — primary: harden `netsurf-fb` (`chvt`, `SDL_FBDEV`, лог
+  `/run/vlanit/gui-netsurf.log`, grace ~1.2 с, один retry). Общий путь
+  installer / doctor / update.
+- `ui-select`: лог `UI primary=gui; fallback=tui|dialog` и
+  `GUI fail → fallback …`. Порядок без изменений: HTML → Cursive →
+  dialog; `vlanit.ui=` только принудительно.
+- QEMU headless часто не удерживает netsurf — fallback TUI/dialog
+  (спека `field-gui-tui-60-61`); на железе с `fb0` primary остаётся HTML.
+
 ## 1.4.6 (2026-11-25)
 
 - Поле #64: `vlanit-probe ifaces` — данные через `IFACES_RAW` (heredoc

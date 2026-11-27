@@ -21,6 +21,7 @@ export VLANIT_UPDATE_DONE="${VLANIT_UPDATE_DONE:-/run/vlanit/update-gui-done}"
 # пакет из argv (handoff из doctor) или пусто → сканирование USB в server
 export VLANIT_UPDATE_PKG="${VLANIT_UPDATE_PKG:-${1:-}}"
 RUN_DIR="$(dirname "$VLANIT_UPDATE_DONE")"
+export VLANIT_GUI_LOG_DIR="$RUN_DIR"
 mkdir -p "$RUN_DIR" "$VLANIT_UPDATE_STATIC"
 
 SURFACE="$(vlanit_fb_pick_surface)" || {
@@ -52,12 +53,11 @@ for _ in $(seq 1 50); do
 done
 
 URL="http://127.0.0.1:${VLANIT_UPDATE_PORT}/"
-NS_PID="$(vlanit_fb_start_netsurf "$URL" "$SURFACE")"
-
-if ! vlanit_fb_wait_done "$SRV_PID" "$NS_PID" "$VLANIT_UPDATE_DONE"; then
+if ! vlanit_fb_serve_browser "$URL" "$SURFACE" "$SRV_PID" "$VLANIT_UPDATE_DONE"; then
     echo "vlanit-update-gui: netsurf-fb ($SURFACE) упал — CLI: vlanit-update" >&2
     exit 2
 fi
+NS_PID="${VLANIT_FB_LAST_NS_PID:-}"
 
 kill "$NS_PID" 2>/dev/null || true
 wait "$NS_PID" 2>/dev/null || true

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Запуск HTML-UI: HTTP + netsurf-fb. Конфиг → /run/vlanit/install-config.json.
+# Primary UI; при fail — ui-select уходит в TUI/dialog.
 set -Eeuo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,6 +11,7 @@ export VLANIT_GUI_STATIC="$INSTALLER_DIR/gui/static"
 export VLANIT_GUI_PORT="${VLANIT_GUI_PORT:-8765}"
 export VLANIT_GUI_MODE="${VLANIT_GUI_MODE:-collect}"
 RUN_DIR=/run/vlanit
+export VLANIT_GUI_LOG_DIR="$RUN_DIR"
 mkdir -p "$RUN_DIR" "$VLANIT_GUI_STATIC"
 
 # логотип PNG из SVG (если есть cairosvg/PIL в live — опционально)
@@ -51,12 +53,11 @@ for _ in $(seq 1 50); do
 done
 
 URL="http://127.0.0.1:${VLANIT_GUI_PORT}/"
-NS_PID="$(vlanit_fb_start_netsurf "$URL" "$SURFACE")"
-
-if ! vlanit_fb_wait_done "$SRV_PID" "$NS_PID" "$RUN_DIR/gui-done"; then
+if ! vlanit_fb_serve_browser "$URL" "$SURFACE" "$SRV_PID" "$RUN_DIR/gui-done"; then
     echo "vlanit-gui: netsurf-fb ($SURFACE) не стартовал/упал — fallback" >&2
     exit 1
 fi
+NS_PID="${VLANIT_FB_LAST_NS_PID:-}"
 
 kill "$NS_PID" 2>/dev/null || true
 wait "$NS_PID" 2>/dev/null || true

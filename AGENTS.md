@@ -62,7 +62,8 @@
 
 ## Learned User Preferences
 
-- GUI-установщик: HTML+FB primary; Cursive fallback; dialog не primary.
+- GUI-установщик: HTML+FB primary; Cursive TUI затем dialog — запасные;
+  `vlanit.ui=` только принудительно.
 - UI править в `installer/gui/` / `doctor/gui/` / `update/gui/`
   (+fallback при нужде); скрины после UI; doctor и OTA-GUI — один стиль.
 - Формы: одна вертикаль полей; схемы дисков не ломать колонки.
@@ -86,7 +87,10 @@ git-ветку или одноразовый статус задачи.
   (хост: docker `rust:1.85-bookworm`; внутри `vlanit-build:1.2+`: apt cargo;
   `build.sh` hard-fail без бинаря).
 - netsurf-fb: Debian без surface `linux` → `sdl`+`SDL_VIDEODRIVER=fbcon`
-  (`installer/lib/netsurf-fb.sh`); смерть browser → fallback TUI/dialog.
+  (`installer/lib/netsurf-fb.sh`: chvt/SDL_FBDEV, лог
+  `/run/vlanit/gui-netsurf.log`, grace+retry); смерть browser → fallback
+  TUI/dialog. QEMU headless часто без устойчивого netsurf — виден TUI,
+  primary на железе остаётся HTML.
 - Галереи UI: installer `docs/gui-installer.md` + `shots/`; doctor
   `docs/doctor-gui.md` + `shots/`; OTA `docs/update-gui.md` + `shots/`;
   установка `docs/installation.md`.
